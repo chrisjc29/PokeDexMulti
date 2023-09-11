@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import com.hoc081098.kmp.viewmodel.SavedStateHandle
 import com.hoc081098.kmp.viewmodel.ViewModel
 import com.unomaster.pokedexgame.domain.PokemonRepository
-import com.unomaster.pokedexgame.domain.Result
+import com.unomaster.pokedexgame.domain.State
 import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
 import com.unomaster.pokedexgame.domain.network.NetworkDependencies
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,13 +26,13 @@ class PokemonViewModel(
     val _overlay = MutableStateFlow<ColorFilter?>(ColorFilter.tint(Color.LightGray))
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val pokemonRequest: StateFlow<Result<CombinedPokemonResponse, String>> =
+    val pokemonRequest: StateFlow<State<CombinedPokemonResponse, String>> =
         _pokemonRequest.flatMapLatest {
             pokemonRepository.fetchPokemon(it)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5000),
-            Result.Loading
+            State.Loading
         )
 
     fun startGame(url: String) {

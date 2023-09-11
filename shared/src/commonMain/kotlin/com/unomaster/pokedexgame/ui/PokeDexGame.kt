@@ -6,9 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
-import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -28,12 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
@@ -42,10 +34,10 @@ import androidx.compose.ui.unit.sp
 import com.hoc081098.kmp.viewmodel.compose.kmpViewModel
 import com.hoc081098.kmp.viewmodel.createSavedStateHandle
 import com.hoc081098.kmp.viewmodel.viewModelFactory
-import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
-import com.unomaster.pokedexgame.domain.Result
+import com.unomaster.pokedexgame.domain.State
 import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
 import com.unomaster.pokedexgame.domain.network.NetworkDependencies
+import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
@@ -84,7 +76,7 @@ fun PokeDexGame() {
             screenModifier
         ) {
             when (val result = combinedPokemonResponse) {
-                is Result.Success<CombinedPokemonResponse> -> {
+                is State.Success<CombinedPokemonResponse> -> {
                     val isWinner = remember { pokemonViewModel._winner }
 
                     when (windowSizeClass.widthSizeClass) {
@@ -108,11 +100,11 @@ fun PokeDexGame() {
                     }
                 }
 
-                is Result.Error -> {
+                is State.Error -> {
                     Text(result.error)
                 }
 
-                is Result.Loading -> {
+                is State.Loading -> {
                     Column(
                         Modifier
                             .fillMaxSize(),
@@ -136,7 +128,7 @@ private fun GameModePortrait(
     pokemonViewModel: PokemonViewModel,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
-    result: Result.Success<CombinedPokemonResponse>
+    state: State.Success<CombinedPokemonResponse>
 ) {
     Column(
         Modifier
@@ -159,7 +151,7 @@ private fun GameModePortrait(
             }
         }
 
-        val pokemonBitmap by remember { result.data.pokemonBitmap }
+        val pokemonBitmap by remember { state.data.pokemonBitmap }
         PokemonImage(
             pokemonBitmap,
             pokemonViewModel
@@ -167,17 +159,17 @@ private fun GameModePortrait(
 
         RestartGame(
             pokemonViewModel,
-            result.data.pokemonApiResponse.next,
+            state.data.pokemonApiResponse.next,
         )
 
-        val multipleChoiceList by remember { result.data.multipleChoiceList }
+        val multipleChoiceList by remember { state.data.multipleChoiceList }
 
         MultipleChoiceContainer(
             multipleChoiceList,
             isWinner,
         ) { selectPokemonName ->
             val pokemonNameFromApi =
-                result.data.pokemonDetailsResponse.name.capitalize(Locale.current)
+                state.data.pokemonDetailsResponse.name.capitalize(Locale.current)
             pokemonViewModel.handleMultipleItemChoiceState(
                 selectPokemonName, pokemonNameFromApi
             )
@@ -190,7 +182,7 @@ private fun GameModeLandscape(
     pokemonViewModel: PokemonViewModel,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
-    result: Result.Success<CombinedPokemonResponse>
+    state: State.Success<CombinedPokemonResponse>
 ) {
     Row(
         Modifier
@@ -211,7 +203,7 @@ private fun GameModeLandscape(
                     textAlign = TextAlign.Center
                 )
 
-                val pokemonBitmap by remember { result.data.pokemonBitmap }
+                val pokemonBitmap by remember { state.data.pokemonBitmap }
                 PokemonImage(
                     pokemonBitmap,
                     pokemonViewModel
@@ -222,17 +214,17 @@ private fun GameModeLandscape(
 
         RestartGame(
             pokemonViewModel,
-            result.data.pokemonApiResponse.next,
+            state.data.pokemonApiResponse.next,
         )
 
-        val multipleChoiceList by remember { result.data.multipleChoiceList }
+        val multipleChoiceList by remember { state.data.multipleChoiceList }
 
         MultipleChoiceContainer(
             multipleChoiceList,
             isWinner,
         ) { selectPokemonName ->
             val pokemonNameFromApi =
-                result.data.pokemonDetailsResponse.name.capitalize(Locale.current)
+                state.data.pokemonDetailsResponse.name.capitalize(Locale.current)
             pokemonViewModel.handleMultipleItemChoiceState(
                 selectPokemonName, pokemonNameFromApi
             )
