@@ -31,7 +31,7 @@ kotlin {
                 implementation(compose.components.resources)
 
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
                 implementation("io.ktor:ktor-client-logging:$ktorVersion")
 
@@ -39,6 +39,14 @@ kotlin {
 
             }
         }
+
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+            }
+        }
+
         val androidMain by getting {
             dependencies {
                 api("androidx.activity:activity-compose:1.7.2")
