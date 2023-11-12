@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 50;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -11,12 +11,6 @@
 		058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 058557D8273AAEEB004C7B11 /* Preview Assets.xcassets */; };
 		2152FB042600AC8F00CF470E /* iOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2152FB032600AC8F00CF470E /* iOSApp.swift */; };
 		7555FF83242A565900829871 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7555FF82242A565900829871 /* ContentView.swift */; };
-		B616653E2B01631000E9E2E4 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B616653D2B01631000E9E2E4 /* GoogleService-Info.plist */; };
-		B6AD81A72B01658B00DA5CDA /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = B6AD81A62B01658B00DA5CDA /* FirebaseAnalytics */; };
-		B6AD81A92B01658B00DA5CDA /* FirebaseAnalyticsOnDeviceConversion in Frameworks */ = {isa = PBXBuildFile; productRef = B6AD81A82B01658B00DA5CDA /* FirebaseAnalyticsOnDeviceConversion */; };
-		B6AD81AB2B01658B00DA5CDA /* FirebaseAnalyticsSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B6AD81AA2B01658B00DA5CDA /* FirebaseAnalyticsSwift */; };
-		B6AD81AD2B01658B00DA5CDA /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = B6AD81AC2B01658B00DA5CDA /* FirebaseAnalyticsWithoutAdIdSupport */; };
-		B6AD81AF2B01658B00DA5CDA /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = B6AD81AE2B01658B00DA5CDA /* FirebaseAppCheck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,7 +33,6 @@
 		7555FF7B242A565900829871 /* PokeDex.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PokeDex.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7555FF82242A565900829871 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		B616653D2B01631000E9E2E4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "../../../../Downloads/GoogleService-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,11 +40,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B6AD81AB2B01658B00DA5CDA /* FirebaseAnalyticsSwift in Frameworks */,
-				B6AD81A72B01658B00DA5CDA /* FirebaseAnalytics in Frameworks */,
-				B6AD81A92B01658B00DA5CDA /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
-				B6AD81AF2B01658B00DA5CDA /* FirebaseAppCheck in Frameworks */,
-				B6AD81AD2B01658B00DA5CDA /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -66,38 +54,12 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		306171AE81AEE1E820F83D4F /* xcschemes */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = xcschemes;
-			sourceTree = "<group>";
-		};
-		306171B79D382E5122B39910 /* christophercurran.xcuserdatad */ = {
-			isa = PBXGroup;
-			children = (
-				306171AE81AEE1E820F83D4F /* xcschemes */,
-			);
-			name = christophercurran.xcuserdatad;
-			path = PokeDex.xcodeproj/project.xcworkspace/xcuserdata/christophercurran.xcuserdatad;
-			sourceTree = "<group>";
-		};
-		3061787A328D5B1AD649587C /* xcschemes */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = xcschemes;
-			path = PokeDex.xcodeproj/xcuserdata/christophercurran.xcuserdatad/xcschemes;
-			sourceTree = "<group>";
-		};
 		7555FF72242A565900829871 = {
 			isa = PBXGroup;
 			children = (
 				7555FF7D242A565900829871 /* iosApp */,
 				7555FF7C242A565900829871 /* Products */,
 				7555FFB0242A642200829871 /* Frameworks */,
-				306171B79D382E5122B39910 /* christophercurran.xcuserdatad */,
-				3061787A328D5B1AD649587C /* xcschemes */,
 			);
 			sourceTree = "<group>";
 		};
@@ -112,7 +74,6 @@
 		7555FF7D242A565900829871 /* iosApp */ = {
 			isa = PBXGroup;
 			children = (
-				B616653D2B01631000E9E2E4 /* GoogleService-Info.plist */,
 				058557BA273AAA24004C7B11 /* Assets.xcassets */,
 				7555FF82242A565900829871 /* ContentView.swift */,
 				7555FF8C242A565B00829871 /* Info.plist */,
@@ -147,13 +108,6 @@
 			dependencies = (
 			);
 			name = PokeDex;
-			packageProductDependencies = (
-				B6AD81A62B01658B00DA5CDA /* FirebaseAnalytics */,
-				B6AD81A82B01658B00DA5CDA /* FirebaseAnalyticsOnDeviceConversion */,
-				B6AD81AA2B01658B00DA5CDA /* FirebaseAnalyticsSwift */,
-				B6AD81AC2B01658B00DA5CDA /* FirebaseAnalyticsWithoutAdIdSupport */,
-				B6AD81AE2B01658B00DA5CDA /* FirebaseAppCheck */,
-			);
 			productName = iosApp;
 			productReference = 7555FF7B242A565900829871 /* PokeDex.app */;
 			productType = "com.apple.product-type.application";
@@ -182,9 +136,6 @@
 				Base,
 			);
 			mainGroup = 7555FF72242A565900829871;
-			packageReferences = (
-				B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-			);
 			productRefGroup = 7555FF7C242A565900829871 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -201,7 +152,6 @@
 			files = (
 				058557D9273AAEEB004C7B11 /* Preview Assets.xcassets in Resources */,
 				058557BB273AAA24004C7B11 /* Assets.xcassets in Resources */,
-				B616653E2B01631000E9E2E4 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -378,7 +328,7 @@
 					"-framework",
 					shared,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.unomaster.iosApp.pokeDexGame;
+				PRODUCT_BUNDLE_IDENTIFIER = orgIdentifier.iosApp.pokeDexGame;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -407,7 +357,7 @@
 					"-framework",
 					shared,
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.unomaster.iosApp.pokeDexGame;
+				PRODUCT_BUNDLE_IDENTIFIER = orgIdentifier.iosApp.pokeDexGame;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -436,45 +386,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 10.17.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		B6AD81A62B01658B00DA5CDA /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
-		};
-		B6AD81A82B01658B00DA5CDA /* FirebaseAnalyticsOnDeviceConversion */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalyticsOnDeviceConversion;
-		};
-		B6AD81AA2B01658B00DA5CDA /* FirebaseAnalyticsSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalyticsSwift;
-		};
-		B6AD81AC2B01658B00DA5CDA /* FirebaseAnalyticsWithoutAdIdSupport */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalyticsWithoutAdIdSupport;
-		};
-		B6AD81AE2B01658B00DA5CDA /* FirebaseAppCheck */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B6AD81A52B01658B00DA5CDA /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAppCheck;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7555FF73242A565900829871 /* Project object */;
 }
