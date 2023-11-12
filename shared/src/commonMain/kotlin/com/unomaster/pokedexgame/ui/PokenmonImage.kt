@@ -8,14 +8,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
-import com.unomaster.pokedexgame.domain.PokemonUseCase
+import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 
 @Composable
 fun PokemonImage(
     pokemonBitmap: ImageBitmap?,
-    pokemonUseCase: PokemonUseCase
+    pokemonViewModel: PokemonViewModel
 ) {
-    val colorFilter = remember { pokemonUseCase._overlay }
+    val colorFilter = remember { pokemonViewModel._overlay }
 
     pokemonBitmap?.let {
         Image(

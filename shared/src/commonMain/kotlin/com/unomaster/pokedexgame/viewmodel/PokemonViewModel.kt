@@ -1,10 +1,13 @@
-package com.unomaster.pokedexgame.domain
+package com.unomaster.pokedexgame.viewmodel
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import com.hoc081098.kmp.viewmodel.SavedStateHandle
+import com.hoc081098.kmp.viewmodel.ViewModel
+import com.unomaster.pokedexgame.domain.PokemonRepository
+import com.unomaster.pokedexgame.domain.Result
 import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
 import com.unomaster.pokedexgame.domain.network.NetworkDependencies
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,11 +16,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
-class PokemonUseCase(
+class PokemonViewModel(
+    private val savedStateHandle: SavedStateHandle,
     private val pokemonRepository: PokemonRepository = PokemonRepository(),
-    scope: CoroutineScope
-) {
-    private val _pokemonRequest = MutableStateFlow<String>(NetworkDependencies.baseUrl)
+): ViewModel() {
+    private val _pokemonRequest = savedStateHandle.getStateFlow("url", NetworkDependencies.baseUrl)
 
     val _winner = MutableStateFlow<Boolean>(false)
     val _overlay = MutableStateFlow<ColorFilter?>(ColorFilter.tint(Color.LightGray))
@@ -27,17 +30,17 @@ class PokemonUseCase(
         _pokemonRequest.flatMapLatest {
             pokemonRepository.fetchPokemon(it)
         }.stateIn(
-            scope,
+            viewModelScope,
             SharingStarted.WhileSubscribed(5000),
             Result.Loading
         )
 
     fun startGame(url: String) {
-        _pokemonRequest.update { url }
+        savedStateHandle["url"] = url
     }
 
     fun restartGame(url: String) {
-        _pokemonRequest.update { url }
+        savedStateHandle["url"] = url
         _winner.update { false }
         _overlay.update { ColorFilter.tint(Color.LightGray) }
     }

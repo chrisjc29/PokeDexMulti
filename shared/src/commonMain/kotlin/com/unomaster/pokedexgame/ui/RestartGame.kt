@@ -13,14 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.unomaster.pokedexgame.domain.PokemonUseCase
+import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 
 @Composable
 fun RestartGame(
-    pokemonUseCase: PokemonUseCase,
+    pokemonViewModel: PokemonViewModel,
     pokemonUrl: String,
 ) {
-    val isWinner = remember { pokemonUseCase._winner }
+    val isWinner = remember { pokemonViewModel._winner }
     val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
 
     AnimatedVisibility(isWinner.collectAsState().value) {
@@ -35,7 +35,7 @@ fun RestartGame(
                     .padding(vertical = 12.dp)
                     .align(Alignment.CenterHorizontally),
                 onClick = {
-                    pokemonUseCase.restartGame(
+                    pokemonViewModel.restartGame(
                         pokemonUrl
                     )
                 }

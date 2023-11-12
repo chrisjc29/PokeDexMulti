@@ -19,10 +19,6 @@ struct iOSApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
-            
-            Button("Crash") {
-              fatalError("Crash was triggered")
-            }
 		}
 	}
 }

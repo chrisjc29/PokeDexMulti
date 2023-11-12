@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Text
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
@@ -22,18 +21,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.unomaster.pokedexgame.domain.PokemonUseCase
+import com.hoc081098.kmp.viewmodel.compose.kmpViewModel
+import com.hoc081098.kmp.viewmodel.createSavedStateHandle
+import com.hoc081098.kmp.viewmodel.viewModelFactory
+import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 import com.unomaster.pokedexgame.domain.Result
 import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
 import com.unomaster.pokedexgame.domain.network.NetworkDependencies
@@ -42,27 +41,30 @@ import kotlinx.coroutines.flow.MutableStateFlow
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun PokeDexGame() {
-    val scope = rememberCoroutineScope()
-    val pokemonUseCase = PokemonUseCase(scope = scope)
-    val combinedPokemonResponse by pokemonUseCase.pokemonRequest.collectAsState()
+    val pokemonViewModel: PokemonViewModel = kmpViewModel(
+        factory = viewModelFactory {
+            PokemonViewModel(savedStateHandle = createSavedStateHandle())
+        },
+    )
+    val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
     val backgroundColor = if (isSystemInDarkTheme()) Color.DarkGray else Color.White
     val progressColor = if (isSystemInDarkTheme()) Color(0xFF67B7D1) else Color.Blue
     val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
     val windowSizeClass = calculateWindowSizeClass()
 
     LaunchedEffect(Unit) {
-        pokemonUseCase.startGame(NetworkDependencies.baseUrl)
+        pokemonViewModel.startGame(NetworkDependencies.baseUrl)
     }
 
     PokeDexGameTheme {
         when (val result = combinedPokemonResponse) {
             is Result.Success<CombinedPokemonResponse> -> {
-                val isWinner = remember { pokemonUseCase._winner }
+                val isWinner = remember { pokemonViewModel._winner }
 
                 when (windowSizeClass.widthSizeClass) {
                     WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
                         GameModeLandscape(
-                            pokemonUseCase,
+                            pokemonViewModel,
                             backgroundColor,
                             isWinner,
                             textColor,
@@ -72,7 +74,7 @@ fun PokeDexGame() {
 
                     WindowWidthSizeClass.Compact -> {
                         GameModePortrait(
-                            pokemonUseCase,
+                            pokemonViewModel,
                             backgroundColor,
                             isWinner,
                             textColor,
@@ -105,7 +107,7 @@ fun PokeDexGame() {
 
 @Composable
 private fun GameModePortrait(
-    pokemonUseCase: PokemonUseCase,
+    pokemonViewModel: PokemonViewModel,
     backgroundColor: Color,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
@@ -135,11 +137,11 @@ private fun GameModePortrait(
         val pokemonBitmap by remember { result.data.pokemonBitmap }
         PokemonImage(
             pokemonBitmap,
-            pokemonUseCase
+            pokemonViewModel
         )
 
         RestartGame(
-            pokemonUseCase,
+            pokemonViewModel,
             result.data.pokemonApiResponse.next,
         )
 
@@ -151,7 +153,7 @@ private fun GameModePortrait(
         ) { selectPokemonName ->
             val pokemonNameFromApi =
                 result.data.pokemonDetailsResponse.name.capitalize(Locale.current)
-            pokemonUseCase.handleMultipleItemChoiceState(
+            pokemonViewModel.handleMultipleItemChoiceState(
                 selectPokemonName, pokemonNameFromApi
             )
         }
@@ -160,7 +162,7 @@ private fun GameModePortrait(
 
 @Composable
 private fun GameModeLandscape(
-    pokemonUseCase: PokemonUseCase,
+    pokemonViewModel: PokemonViewModel,
     backgroundColor: Color,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
@@ -187,14 +189,14 @@ private fun GameModeLandscape(
                 val pokemonBitmap by remember { result.data.pokemonBitmap }
                 PokemonImage(
                     pokemonBitmap,
-                    pokemonUseCase
+                    pokemonViewModel
                 )
             }
         }
 
 
         RestartGame(
-            pokemonUseCase,
+            pokemonViewModel,
             result.data.pokemonApiResponse.next,
         )
 
@@ -206,7 +208,7 @@ private fun GameModeLandscape(
         ) { selectPokemonName ->
             val pokemonNameFromApi =
                 result.data.pokemonDetailsResponse.name.capitalize(Locale.current)
-            pokemonUseCase.handleMultipleItemChoiceState(
+            pokemonViewModel.handleMultipleItemChoiceState(
                 selectPokemonName, pokemonNameFromApi
             )
         }

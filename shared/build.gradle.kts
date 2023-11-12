@@ -24,6 +24,8 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
+                api("io.github.hoc081098:kmp-viewmodel-compose:0.5.0")
+
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material)
