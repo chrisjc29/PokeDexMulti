@@ -32,13 +32,9 @@ kotlin {
 
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
                 implementation("io.ktor:ktor-client-logging:$ktorVersion")
-
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
-
                 implementation("dev.chrisbanes.material3:material3-window-size-class-multiplatform:0.3.1")
-
             }
         }
 
