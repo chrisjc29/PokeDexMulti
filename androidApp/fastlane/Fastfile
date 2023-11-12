@@ -1,0 +1,24 @@
+update_fastlane
+
+default_platform(:android)
+
+platform :android do
+   desc "Build"
+   lane :build do
+     gradle(
+        task: "bundle",
+        build_type: "Release",
+        project_dir: '../'
+      )
+   end
+
+   desc "Submit a new Beta Build to Firebase App Distribution"
+   lane :beta do
+    build
+    firebase_app_distribution(
+        app: "1:109281121087:android:040cc65fdb9040e3b7f98a",
+        groups: "testers",
+        release_notes: "Enjoy!!"
+    )
+   end
+end
