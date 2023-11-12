@@ -6,8 +6,8 @@ platform :android do
    desc "Build"
    lane :build do
      gradle(
-        task: "bundle",
-        build_type: "Release",
+        task: "assemble",
+        build_type: "Debug",
         project_dir: '../'
       )
    end
