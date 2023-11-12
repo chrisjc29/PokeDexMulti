@@ -1,4 +1,5 @@
 import SwiftUI
+import Firebase
 
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -18,6 +19,10 @@ struct iOSApp: App {
 	var body: some Scene {
 		WindowGroup {
 			ContentView()
+            
+            Button("Crash") {
+              fatalError("Crash was triggered")
+            }
 		}
 	}
 }
