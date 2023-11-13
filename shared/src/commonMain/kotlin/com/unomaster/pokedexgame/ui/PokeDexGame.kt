@@ -3,15 +3,20 @@ package com.unomaster.pokedexgame.ui
 import PokeDexGameTheme
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.CircularProgressIndicator
+import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -23,7 +28,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
@@ -47,59 +57,75 @@ fun PokeDexGame() {
         },
     )
     val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
-    val backgroundColor = if (isSystemInDarkTheme()) Color.DarkGray else Color.White
-    val progressColor = if (isSystemInDarkTheme()) Color(0xFF67B7D1) else Color.Blue
-    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
+    val backgroundColor = if (isSystemInDarkTheme()) Color(102, 178, 255)
+    else Color(102, 178, 255)
+    val progressColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
+    val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
     val windowSizeClass = calculateWindowSizeClass()
+
 
     LaunchedEffect(Unit) {
         pokemonViewModel.startGame(NetworkDependencies.baseUrl)
     }
 
+    val screenModifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .padding(12.dp)
+        .background(backgroundColor, RoundedCornerShape(8.dp))
+        .border(
+            8.dp,
+            Color(0, 0, 204),
+            RoundedCornerShape(8.dp)
+        )
+
     PokeDexGameTheme {
-        when (val result = combinedPokemonResponse) {
-            is Result.Success<CombinedPokemonResponse> -> {
-                val isWinner = remember { pokemonViewModel._winner }
+        Column(
+            screenModifier
+        ) {
+            when (val result = combinedPokemonResponse) {
+                is Result.Success<CombinedPokemonResponse> -> {
+                    val isWinner = remember { pokemonViewModel._winner }
 
-                when (windowSizeClass.widthSizeClass) {
-                    WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
-                        GameModeLandscape(
-                            pokemonViewModel,
-                            backgroundColor,
-                            isWinner,
-                            textColor,
-                            result
+                    when (windowSizeClass.widthSizeClass) {
+                        WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
+                            GameModeLandscape(
+                                pokemonViewModel,
+                                isWinner,
+                                textColor,
+                                result
+                            )
+                        }
+
+                        WindowWidthSizeClass.Compact -> {
+                            GameModePortrait(
+                                pokemonViewModel,
+                                isWinner,
+                                textColor,
+                                result
+                            )
+                        }
+                    }
+                }
+
+                is Result.Error -> {
+                    Text(result.error)
+                }
+
+                is Result.Loading -> {
+                    Column(
+                        Modifier
+                            .fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(120.dp),
+                            color = progressColor
                         )
                     }
 
-                    WindowWidthSizeClass.Compact -> {
-                        GameModePortrait(
-                            pokemonViewModel,
-                            backgroundColor,
-                            isWinner,
-                            textColor,
-                            result
-                        )
-                    }
                 }
-            }
-
-            is Result.Error -> {
-                Text(result.error)
-            }
-
-            is Result.Loading -> {
-                Column(
-                    Modifier.fillMaxSize().background(backgroundColor),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(120.dp),
-                        color = progressColor
-                    )
-                }
-
             }
         }
     }
@@ -108,17 +134,16 @@ fun PokeDexGame() {
 @Composable
 private fun GameModePortrait(
     pokemonViewModel: PokemonViewModel,
-    backgroundColor: Color,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
     result: Result.Success<CombinedPokemonResponse>
 ) {
     Column(
-        Modifier.fillMaxSize().background(backgroundColor),
+        Modifier
+            .fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
         AnimatedVisibility(!isWinner.collectAsState().value) {
             Row(
                 Modifier.fillMaxWidth().padding(vertical = 12.dp),
@@ -163,13 +188,13 @@ private fun GameModePortrait(
 @Composable
 private fun GameModeLandscape(
     pokemonViewModel: PokemonViewModel,
-    backgroundColor: Color,
     isWinner: MutableStateFlow<Boolean>,
     textColor: Color,
     result: Result.Success<CombinedPokemonResponse>
 ) {
     Row(
-        Modifier.fillMaxSize().background(backgroundColor),
+        Modifier
+            .fillMaxSize(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -42,8 +42,8 @@ fun MultipleChoiceItem(
     value: String,
     onClick: (name: String) -> Unit
 ) {
-    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
-    val borderColor = if (isSystemInDarkTheme()) Color.White else Color.LightGray
+    val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
+    val borderColor = if (isSystemInDarkTheme()) Color.DarkGray else Color.DarkGray
 
     val coroutineScope = rememberCoroutineScope()
     val view = LocalHapticFeedback.current

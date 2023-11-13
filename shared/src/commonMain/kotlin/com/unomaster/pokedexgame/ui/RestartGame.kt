@@ -21,7 +21,7 @@ fun RestartGame(
     pokemonUrl: String,
 ) {
     val isWinner = remember { pokemonViewModel._winner }
-    val textColor = if (isSystemInDarkTheme()) Color.White else Color.Black
+    val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
 
     AnimatedVisibility(isWinner.collectAsState().value) {
         Column {
