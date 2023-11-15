@@ -34,89 +34,104 @@ import androidx.compose.ui.unit.sp
 import com.hoc081098.kmp.viewmodel.compose.kmpViewModel
 import com.hoc081098.kmp.viewmodel.createSavedStateHandle
 import com.hoc081098.kmp.viewmodel.viewModelFactory
+import com.unomaster.pokedexgame.di.baseUrl
+import com.unomaster.pokedexgame.di.domainDependencies
+import com.unomaster.pokedexgame.domain.PokemonRepository
 import com.unomaster.pokedexgame.domain.State
 import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
-import com.unomaster.pokedexgame.domain.network.NetworkDependencies
 import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.koin.compose.KoinApplication
+import org.koin.compose.rememberKoinInject
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @Composable
 fun PokeDexGame() {
-    val pokemonViewModel: PokemonViewModel = kmpViewModel(
-        factory = viewModelFactory {
-            PokemonViewModel(savedStateHandle = createSavedStateHandle())
-        },
-    )
-    val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
-    val backgroundColor = if (isSystemInDarkTheme()) Color(102, 178, 255)
-    else Color(102, 178, 255)
-    val progressColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
-    val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
-    val windowSizeClass = calculateWindowSizeClass()
+    KoinApplication(
+        moduleList = {
+            listOf(domainDependencies)
+        }
+    ) {
+        val pokemonRepository = rememberKoinInject<PokemonRepository>()
 
-
-    LaunchedEffect(Unit) {
-        pokemonViewModel.startGame(NetworkDependencies.baseUrl)
-    }
-
-    val screenModifier = Modifier
-        .fillMaxSize()
-        .background(Color.Black)
-        .padding(12.dp)
-        .background(backgroundColor, RoundedCornerShape(8.dp))
-        .border(
-            8.dp,
-            Color(0, 0, 204),
-            RoundedCornerShape(8.dp)
+        val pokemonViewModel: PokemonViewModel = kmpViewModel(
+            factory = viewModelFactory {
+                PokemonViewModel(
+                    savedStateHandle = createSavedStateHandle(),
+                    pokemonRepositoryImpl = pokemonRepository
+                )
+            },
         )
+        val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
+        val backgroundColor = if (isSystemInDarkTheme()) Color(102, 178, 255)
+        else Color(102, 178, 255)
+        val progressColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
+        val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
+        val windowSizeClass = calculateWindowSizeClass()
 
-    PokeDexGameTheme {
-        Column(
-            screenModifier
-        ) {
-            when (val result = combinedPokemonResponse) {
-                is State.Success<CombinedPokemonResponse> -> {
-                    val isWinner = remember { pokemonViewModel._winner }
 
-                    when (windowSizeClass.widthSizeClass) {
-                        WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
-                            GameModeLandscape(
-                                pokemonViewModel,
-                                isWinner,
-                                textColor,
-                                result
+        LaunchedEffect(Unit) {
+            pokemonViewModel.startGame(baseUrl)
+        }
+
+        val screenModifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 102.dp)
+            .background(backgroundColor, RoundedCornerShape(12.dp))
+            .border(
+                12.dp,
+                Color(0, 0, 204),
+                RoundedCornerShape(8.dp)
+            )
+
+        PokeDexGameTheme {
+            Column(
+                screenModifier
+            ) {
+                when (val result = combinedPokemonResponse) {
+                    is State.Success<CombinedPokemonResponse> -> {
+                        val isWinner = remember { pokemonViewModel.winner }
+
+                        when (windowSizeClass.widthSizeClass) {
+                            WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
+                                GameModeLandscape(
+                                    pokemonViewModel,
+                                    isWinner,
+                                    textColor,
+                                    result
+                                )
+                            }
+
+                            WindowWidthSizeClass.Compact -> {
+                                GameModePortrait(
+                                    pokemonViewModel,
+                                    isWinner,
+                                    textColor,
+                                    result
+                                )
+                            }
+                        }
+                    }
+
+                    is State.Error -> {
+                        Text(result.error)
+                    }
+
+                    is State.Loading -> {
+                        Column(
+                            Modifier
+                                .fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(120.dp),
+                                color = progressColor
                             )
                         }
 
-                        WindowWidthSizeClass.Compact -> {
-                            GameModePortrait(
-                                pokemonViewModel,
-                                isWinner,
-                                textColor,
-                                result
-                            )
-                        }
                     }
-                }
-
-                is State.Error -> {
-                    Text(result.error)
-                }
-
-                is State.Loading -> {
-                    Column(
-                        Modifier
-                            .fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(120.dp),
-                            color = progressColor
-                        )
-                    }
-
                 }
             }
         }

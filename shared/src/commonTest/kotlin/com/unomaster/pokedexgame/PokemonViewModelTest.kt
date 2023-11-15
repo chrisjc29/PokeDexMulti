@@ -2,11 +2,10 @@ package com.unomaster.pokedexgame
 
 import androidx.compose.ui.graphics.ColorFilter
 import com.hoc081098.kmp.viewmodel.SavedStateHandle
-import com.unomaster.pokedexgame.domain.PokemonRepository
+import com.unomaster.pokedexgame.domain.PokemonRepositoryImpl
 import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
-import com.unomaster.pokedexgame.domain.network.PokemonService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import com.unomaster.pokedexgame.network.PokemonServiceImpl
+import io.ktor.client.HttpClient
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,39 +14,41 @@ import kotlin.test.assertTrue
 
 class PokemonViewModelTest {
 
-    private val pokemonService = PokemonService()
+    private val client = HttpClient()
+    private val pokemonService = PokemonServiceImpl(client)
 
-    private val pokemonRepository = PokemonRepository(
-        pokemonService
+    private val pokemonRepositoryImpl = PokemonRepositoryImpl(
+        pokemonService,
+        client
     )
 
     private val pokemonViewModel = PokemonViewModel(
         SavedStateHandle(),
-        pokemonRepository
+        pokemonRepositoryImpl
     )
 
     @Test
     fun `when restarting the game _winner and _overlay are reset to default values of false and a ColorFilter`() {
         pokemonViewModel.restartGame("test")
 
-        assertFalse { pokemonViewModel._winner.value }
-        assertIs<ColorFilter>(pokemonViewModel._overlay.value)
+        assertFalse { pokemonViewModel.winner.value }
+        assertIs<ColorFilter>(pokemonViewModel.overlay.value)
     }
 
     @Test
-    fun `when a user has selected the correct pokemmon the game _winner and _overlay are set to true and null`() {
+    fun `when a user has selected the correct pokemon the game _winner and _overlay are set to true and null`() {
         pokemonViewModel.handleMultipleItemChoiceState("test", "test")
 
-        assertTrue { pokemonViewModel._winner.value }
-        assertEquals(null, pokemonViewModel._overlay.value)
+        assertTrue { pokemonViewModel.winner.value }
+        assertEquals(null, pokemonViewModel.overlay.value)
 
     }
 
     @Test
-    fun `when a user has selected the incorrect pokemmon the game _winner and _overlay are set to false and a ColorFilter`() {
+    fun `when a user has selected the incorrect pokemon the game _winner and _overlay are set to false and a ColorFilter`() {
         pokemonViewModel.handleMultipleItemChoiceState("test", "something else")
 
-        assertFalse { pokemonViewModel._winner.value }
-        assertIs<ColorFilter>(pokemonViewModel._overlay.value)
+        assertFalse { pokemonViewModel.winner.value }
+        assertIs<ColorFilter>(pokemonViewModel.overlay.value)
     }
 }

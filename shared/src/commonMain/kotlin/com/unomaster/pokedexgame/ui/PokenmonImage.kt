@@ -21,7 +21,7 @@ fun PokemonImage(
     pokemonBitmap: ImageBitmap?,
     pokemonViewModel: PokemonViewModel
 ) {
-    val colorFilter = remember { pokemonViewModel._overlay }
+    val colorFilter = remember { pokemonViewModel.overlay }
 
     pokemonBitmap?.let {
         Image(
