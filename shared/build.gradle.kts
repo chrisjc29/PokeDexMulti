@@ -44,17 +44,6 @@ kotlin {
                 implementation("dev.chrisbanes.material3:material3-window-size-class-multiplatform:0.3.1")
 
                 implementation("io.insert-koin:koin-compose:1.1.0")
-//
-//                /* other implementations */
-//                implementation("co.touchlab:stately-common:2.0.0-rc3")
-//                implementation("co.touchlab:stately-collections:2.0.0-rc3")
-//                implementation("co.touchlab:stately-concurrency:2.0.5")
-//                implementation("co.touchlab:stately-isolate:2.0.0-rc3")
-//
-//                configurations.all {
-//                    exclude(group = "co.touchlab", module = "stately-strict-jvm")
-//                }
-
             }
         }
 
