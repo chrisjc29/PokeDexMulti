@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.domain
+package com.currantbun.pokedexmulti.data
 
 sealed class MultipleChoiceRotationState(private val angle: Float) {
     data class Front(val angle: Float = 0f): MultipleChoiceRotationState(angle) {

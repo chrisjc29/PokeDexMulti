@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.domain
+package com.currantbun.pokedexmulti.data
 
 sealed interface State<out Data, out Error> {
     data class Success<D>(val data: D):State<D, Nothing>

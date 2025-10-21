@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.ui
+package com.currantbun.pokedexmulti.presentation
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding

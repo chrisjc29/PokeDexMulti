@@ -1,19 +1,17 @@
-package com.unomaster.pokedexgame.domain
+package com.currantbun.pokedexmulti.data
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
-import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
+import com.currantbun.pokedexmulti.data.networkModels.CombinedPokemonResponse
 import com.unomaster.pokedexgame.domain.models.PokemonApiResponse
 import com.unomaster.pokedexgame.domain.models.PokemonDetailsResponse
-import com.unomaster.pokedexgame.network.PokemonService
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.flow
 import kotlin.random.Random
 
 class PokemonRepositoryImpl(
     private val pokemonService: PokemonService,
-    private val client: HttpClient,
 ): PokemonRepository {
     override suspend fun fetchPokemon(url: String) = flow {
         emit(State.Loading)
@@ -32,7 +30,6 @@ class PokemonRepositoryImpl(
                         safePokemonListRequest,
                         safePokemonDetailsResponse,
                         multipleChoiceList,
-                        client
                     )
 
                     emit(State.Success(combinedPokemonResponse))
@@ -46,17 +43,14 @@ class PokemonRepositoryImpl(
     }
 }
 
-private suspend fun combinedPokemonResponse(
+private fun combinedPokemonResponse(
     pokemonApiResponse: PokemonApiResponse,
     pokemonDetailsResponse: PokemonDetailsResponse,
     multipleChoiceList: List<String>,
-    client: HttpClient
 ) = CombinedPokemonResponse(
     pokemonApiResponse,
     pokemonDetailsResponse,
-    pokemonBitmap = mutableStateOf(
-        loadImageFromUrl(pokemonDetailsResponse.sprites.other.officialArtwork.frontDefault, client),
-    ),
+    pokemonUrl = pokemonDetailsResponse.sprites.other.officialArtwork.frontDefault,
     multipleChoiceList = mutableStateOf(
         multipleChoiceList
     )
