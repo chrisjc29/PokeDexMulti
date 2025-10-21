@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.ui
+package com.currantbun.pokedexmulti.presentation
 
 import PokeDexGameTheme
 import androidx.compose.animation.AnimatedVisibility
@@ -40,111 +40,98 @@ import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.unomaster.pokedexgame.di.baseUrl
-import com.unomaster.pokedexgame.di.domainDependencies
-import com.unomaster.pokedexgame.domain.State
-import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
-import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
+import com.currantbun.pokedexmulti.data.State
+import com.currantbun.pokedexmulti.data.baseUrl
+import com.currantbun.pokedexmulti.data.networkModels.CombinedPokemonResponse
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.koin.compose.KoinApplication
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.dsl.koinApplication
+import org.koin.compose.koinInject
 
-fun koinConfiguration() = koinApplication {
-    modules(listOf(domainDependencies))
-}
 
 @Composable
 fun PokeDexGame() {
-    KoinApplication({ koinConfiguration() }) {
-        val gameStart = remember { mutableStateOf(false) }
-        val pokemonViewModel: PokemonViewModel = koinViewModel()
-        val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
-        val backgroundColor = if (isSystemInDarkTheme()) Color(102, 178, 255)
-        else Color(102, 178, 255)
-        val progressColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
-        val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
-        val windowSizeClass = ()
 
+    val gameStart = remember { mutableStateOf(false) }
+    val pokemonViewModel: PokemonViewModel = koinInject()
+    val combinedPokemonResponse by pokemonViewModel.pokemonRequest.collectAsState()
+    val backgroundColor = if (isSystemInDarkTheme()) Color(102, 178, 255)
+    else Color(102, 178, 255)
+    val progressColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
+    val textColor = if (isSystemInDarkTheme()) Color.Black else Color.Black
 
-        LaunchedEffect(Unit) {
-            pokemonViewModel.startGame(baseUrl)
-        }
+    LaunchedEffect(Unit) {
+        pokemonViewModel.startGame(baseUrl)
+    }
 
-        val screenModifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(16.dp)
-            .background(backgroundColor, RoundedCornerShape(12.dp))
-            .border(
-                12.dp,
-                Color(0, 0, 204),
-                RoundedCornerShape(8.dp)
-            )
+    val screenModifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)
+        .padding(16.dp)
+        .background(backgroundColor, RoundedCornerShape(12.dp))
+        .border(
+            12.dp,
+            Color(0, 0, 204),
+            RoundedCornerShape(8.dp)
+        )
 
-        PokeDexGameTheme {
-            if (!gameStart.value) {
-                Column(
-                    screenModifier,
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Pokeball()
-                    Button(onClick = {
-                        gameStart.value = true
-                    }) {
-                        Text("Start Game!")
-                    }
+    PokeDexGameTheme {
+        if (!gameStart.value) {
+            Column(
+                screenModifier,
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Pokeball()
+                Button(onClick = {
+                    gameStart.value = true
+                }) {
+                    Text("Start Game!")
                 }
             }
+        }
 
-            if (gameStart.value) {
-                Column(
-                    screenModifier
-                ) {
-                    when (val result = combinedPokemonResponse) {
-                        is State.Success<CombinedPokemonResponse> -> {
-                            val isWinner = remember { pokemonViewModel.winner }
+        if (gameStart.value) {
+            Column(
+                screenModifier
+            ) {
+                when (val result = combinedPokemonResponse) {
+                    is State.Success<CombinedPokemonResponse> -> {
+                        val isWinner = remember { pokemonViewModel.winner }
 
-                            when (windowSizeClass.widthSizeClass) {
-                                WindowWidthSizeClass.Medium, WindowWidthSizeClass.Expanded -> {
-                                    GameModeLandscape(
-                                        pokemonViewModel,
-                                        isWinner,
-                                        textColor,
-                                        result
-                                    )
-                                }
 
-                                WindowWidthSizeClass.Compact -> {
-                                    GameModePortrait(
-                                        pokemonViewModel,
-                                        isWinner,
-                                        textColor,
-                                        result
-                                    )
-                                }
-                            }
+//                            GameModeLandscape(
+//                                pokemonViewModel,
+//                                isWinner,
+//                                textColor,
+//                                result
+//                            )
+
+
+                        GameModePortrait(
+                            pokemonViewModel,
+                            isWinner,
+                            textColor,
+                            result
+                        )
+
+                    }
+
+                    is State.Error -> {
+                        Text(result.error)
+                    }
+
+                    is State.Loading -> {
+                        Column(
+                            Modifier
+                                .fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(120.dp),
+                                color = progressColor
+                            )
                         }
 
-                        is State.Error -> {
-                            Text(result.error)
-                        }
-
-                        is State.Loading -> {
-                            Column(
-                                Modifier
-                                    .fillMaxSize(),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(120.dp),
-                                    color = progressColor
-                                )
-                            }
-
-                        }
                     }
                 }
             }
@@ -180,9 +167,8 @@ private fun GameModePortrait(
             }
         }
 
-        val pokemonBitmap by remember { state.data.pokemonBitmap }
         PokemonImage(
-            pokemonBitmap,
+            state.data.pokemonUrl,
             pokemonViewModel
         )
 
@@ -226,9 +212,8 @@ private fun GameModeLandscape(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 GameTitleText(textColor)
-                val pokemonBitmap by remember { state.data.pokemonBitmap }
                 PokemonImage(
-                    pokemonBitmap,
+                    state.data.pokemonUrl,
                     pokemonViewModel
                 )
             }

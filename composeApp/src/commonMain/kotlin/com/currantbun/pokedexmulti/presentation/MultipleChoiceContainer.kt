@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.ui
+package com.currantbun.pokedexmulti.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +24,7 @@ fun MultipleChoiceContainer(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                MultipleChoiceItem(multipleChoiceList[0], onClick )
+                MultipleChoiceItem(multipleChoiceList[0], onClick)
                 MultipleChoiceItem(multipleChoiceList[1], onClick)
             }
             Row(

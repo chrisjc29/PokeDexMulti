@@ -1,7 +1,5 @@
-package com.unomaster.pokedexgame.di
+package com.currantbun.pokedexmulti.data
 
-import com.unomaster.pokedexgame.network.PokemonService
-import com.unomaster.pokedexgame.network.PokemonServiceImpl
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.DefaultRequest
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -16,7 +14,6 @@ val networkDependencies = module {
     single { provideBaseUrl() }
     single { provideCustomJson() }
     single { provideClient() }
-    single<PokemonService> { PokemonServiceImpl(get()) }
 }
 
 

@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.network
+package com.currantbun.pokedexmulti.data
 
 import com.unomaster.pokedexgame.domain.models.PokemonApiResponse
 import com.unomaster.pokedexgame.domain.models.PokemonDetailsResponse

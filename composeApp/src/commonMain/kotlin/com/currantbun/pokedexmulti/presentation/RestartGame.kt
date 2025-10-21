@@ -1,4 +1,4 @@
-package com.unomaster.pokedexgame.ui
+package com.currantbun.pokedexmulti.presentation
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.unomaster.pokedexgame.viewmodel.PokemonViewModel
 
 @Composable
 fun RestartGame(

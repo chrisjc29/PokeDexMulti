@@ -1,13 +1,14 @@
-package com.unomaster.pokedexgame.domain.models
+package com.currantbun.pokedexmulti.data.networkModels
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.ImageBitmap
+import com.unomaster.pokedexgame.domain.models.PokemonApiResponse
+import com.unomaster.pokedexgame.domain.models.PokemonDetailsResponse
 
 
 data class CombinedPokemonResponse(
     val pokemonApiResponse: PokemonApiResponse,
     val pokemonDetailsResponse: PokemonDetailsResponse,
-    val pokemonBitmap: MutableState<ImageBitmap?> = mutableStateOf(null),
+    val pokemonUrl: String,
     val multipleChoiceList: MutableState<List<String>> = mutableStateOf(emptyList())
 )

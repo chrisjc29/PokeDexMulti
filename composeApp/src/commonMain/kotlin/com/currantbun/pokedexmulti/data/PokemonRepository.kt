@@ -1,6 +1,6 @@
-package com.unomaster.pokedexgame.domain
+package com.currantbun.pokedexmulti.data
 
-import com.unomaster.pokedexgame.domain.models.CombinedPokemonResponse
+import com.currantbun.pokedexmulti.data.networkModels.CombinedPokemonResponse
 import kotlinx.coroutines.flow.Flow
 
 interface PokemonRepository {

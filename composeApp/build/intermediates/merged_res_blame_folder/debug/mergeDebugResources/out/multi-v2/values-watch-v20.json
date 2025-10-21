@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.currantbun.pokedexmulti.composeApp-mergeDebugResources-44:/values-watch-v20/values-watch-v20.xml",
+            "map": [
+                {
+                    "source": "/Users/christophercurran/.gradle/caches/8.14.3/transforms/4ab9d830cdb292b18e31b0d69dde366a/transformed/appcompat-1.7.1/res/values-watch-v20/values-watch-v20.xml",
+                    "from": {
+                        "startLines": "2,5,8",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,214,385",
+                        "endLines": "4,7,10",
+                        "endColumns": "12,12,12",
+                        "endOffsets": "209,380,553"
+                    }
+                }
+            ]
+        }
+    ]
+}

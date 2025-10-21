@@ -13,7 +13,6 @@ import org.jetbrains.compose.resources.StringResource
 
 internal actual val Res.allDrawableResources: Map<String, DrawableResource> by lazy {
   val map = mutableMapOf<String, DrawableResource>()
-  _collectCommonMainDrawable0Resources(map)
   return@lazy map
 }
 
