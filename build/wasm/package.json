@@ -1,0 +1,23 @@
+{
+  "name": "PokeDexMulti",
+  "version": "unspecified",
+  "private": true,
+  "workspaces": [
+    "packages/PokeDexMulti-composeApp",
+    "packages/PokeDexMulti-composeApp-test",
+    "packages_imported/skiko-wasm-js/0.9.22-2",
+    "packages_imported/skiko-js-wasm-runtime/0.9.22-2",
+    "packages_imported/Kotlin-DateTime-library-kotlinx-datetime-wasm-js/0.6.0",
+    "packages_imported/ktor-ktor-client-core/3.3.1",
+    "packages_imported/coil-core-wasm-js/3.3.0",
+    "packages_imported/coil-wasm-js/3.3.0",
+    "packages_imported/coil-network-ktor3-wasm-js/3.3.0",
+    "packages_imported/coil-network-core-wasm-js/3.3.0"
+  ],
+  "devDependencies": {},
+  "dependencies": {},
+  "peerDependencies": {},
+  "optionalDependencies": {},
+  "bundledDependencies": [],
+  "resolutions": {}
+}
