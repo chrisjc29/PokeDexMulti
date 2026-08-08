@@ -1,33 +1,51 @@
-# Gradle files
+# --- Gradle / Kotlin ---
 .gradle/
 build/
-
-# Local configuration file (sdk path, etc)
+**/build/
+# don't ignore a source package literally named "build"
+!src/**/build/
+# Kotlin 2.x build services / KMP metadata cache
+.kotlin/
+*.iml
+*.hprof
+# machine-specific SDK paths — never commit
 local.properties
 
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-output.json
-
-# IntelliJ
-*.iml
+# --- IDE (Android Studio / IntelliJ / Fleet / VS Code / Xcode) ---
 .idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+!.idea/copyright/
+.fleet/
+.vscode/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcuserdata/
 
-# Keystore files
-*.jks
-*.keystore
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.cxx/
+# signing secrets; the .PLACEHOLDER IS committed
+keystore.properties
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
+# --- iOS / Xcode / CocoaPods (if used) ---
+Pods/
+*.xcworkspace/xcuserdata/
+DerivedData/
 
-# Android Profiling
-*.hprof
+# --- Roborazzi: goldens live in src/androidUnitTest/screenshots/ and ARE committed.
+#     Only the throwaway comparison/diff artifacts under build/ are ignored. ---
+**/build/outputs/roborazzi/
+
+# --- Firebase config: keep real keys out of git (only relevant when firebase.enabled=true) ---
+composeApp/google-services.json
+iosApp/iosApp/GoogleService-Info.plist
+# The *.PLACEHOLDER files ARE committed — they document what to drop in.
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
