@@ -8,6 +8,26 @@ application.
 Arrow (typed errors) · Coil 3 (images) · Firebase Analytics + Crashlytics (native per platform,
 opt-in) · clean architecture (data / domain / presentation) · MVI presentation.
 
+## Screenshots
+
+The whole UI is a handheld Pokédex — red shell, hinged screen bezel, scanline glass, LED cluster and
+monospaced readouts. One round, start to finish:
+
+<table>
+  <tr>
+    <td width="25%"><img src="docs/screenshots/home.png" alt="Home screen: the Pokédex closed, showing the title, the best streak and a START GAME button." width="100%"></td>
+    <td width="25%"><img src="docs/screenshots/playing.png" alt="Game screen: a Pokémon silhouette on the scanline screen above four answer buttons." width="100%"></td>
+    <td width="25%"><img src="docs/screenshots/wrong-guess.png" alt="Game screen after a wrong guess: the readout says NO MATCH, the choice is struck through and the red LED is lit." width="100%"></td>
+    <td width="25%"><img src="docs/screenshots/solved.png" alt="Game screen solved: the artwork revealed in colour with the Pokémon's name, type and streak." width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Home</b><br><sub>Start, and your best streak</sub></td>
+    <td align="center"><b>Identify</b><br><sub>Silhouette + four choices</sub></td>
+    <td align="center"><b>No match</b><br><sub>Wrong guesses burn a life</sub></td>
+    <td align="center"><b>Match confirmed</b><br><sub>Artwork, type, streak</sub></td>
+  </tr>
+</table>
+
 ## The feature, through every layer
 
 Three screens — **Home** (start), **Game** (the round), **Settings**. One round flows through the
@@ -33,10 +53,19 @@ the clock seam and is wired through `platformModule` with a `FixedCurrentTimePro
 
 ### Settings
 
+<table>
+  <tr>
+    <td width="30%"><img src="docs/screenshots/settings.png" alt="Settings screen: a single Share analytics toggle on the Pokédex screen." width="100%"></td>
+    <td valign="top">
+
 `SettingsViewModel` persists the analytics opt-in through the `KeyValueStore` expect/actual
 (SharedPreferences on Android, `NSUserDefaults` on iOS). Note that today the preference is only
 stored and re-read — the `Analytics` implementations do not consult it yet, so flipping the switch
 does not currently mute event logging.
+
+  </td>
+  </tr>
+</table>
 
 ## Error handling
 
