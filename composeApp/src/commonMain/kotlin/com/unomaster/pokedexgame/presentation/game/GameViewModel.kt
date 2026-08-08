@@ -2,7 +2,9 @@ package com.unomaster.pokedexgame.presentation.game
 
 import arrow.core.raise.either
 import com.unomaster.pokedexgame.analytics.CrashReporter
+import com.unomaster.pokedexgame.data.local.BestStreakStore
 import com.unomaster.pokedexgame.domain.model.PokemonQuestion
+import com.unomaster.pokedexgame.domain.time.CurrentTimeProvider
 import com.unomaster.pokedexgame.domain.usecase.GetPokemonQuestionUseCase
 import com.unomaster.pokedexgame.navigation.AppNavigator
 import com.unomaster.pokedexgame.presentation.common.OperationViewModel
@@ -16,6 +18,8 @@ import kotlinx.coroutines.flow.update
 class GameViewModel(
     private val getPokemonQuestion: GetPokemonQuestionUseCase,
     private val navigator: AppNavigator,
+    private val bestStreakStore: BestStreakStore,
+    private val currentTime: CurrentTimeProvider,
     crashReporter: CrashReporter,
 ) : OperationViewModel(crashReporter) {
 
@@ -34,18 +38,36 @@ class GameViewModel(
     // isCorrect() belongs to PokemonQuestion, and copying it into the UI state would duplicate it.
     private var question: PokemonQuestion? = null
 
+    // When the current round's artwork appeared. Not in GameState for the same reason: it is an
+    // input to the solve time, not something the screen renders.
+    private var roundStartedAt: Long = 0
+
     // Loading on init rather than from a LaunchedEffect in the screen: the ViewModel is scoped to
     // the nav entry, so this runs once per visit instead of on every recomposition.
     init {
-        loadQuestion(pageUrl = null)
+        loadQuestion(pageUrl = null, roundNumber = 1, streak = 0)
     }
 
     // Single entry point for the UI: send an intent, the ViewModel decides what to do.
     fun onIntent(intent: GameIntent) {
+        val current = mutableState.value
         when (intent) {
             is GameIntent.ChoiceSelected -> selectChoice(intent.choice)
-            GameIntent.PlayAgain -> loadQuestion(pageUrl = nextPageUrl)
-            GameIntent.Retry -> loadQuestion(pageUrl = nextPageUrl)
+
+            // A new specimen is a new round; a retry is the same round having another go at
+            // loading, so only one of them advances the counter.
+            GameIntent.PlayAgain -> loadQuestion(
+                pageUrl = nextPageUrl,
+                roundNumber = current.roundNumber + 1,
+                streak = current.streak,
+            )
+
+            GameIntent.Retry -> loadQuestion(
+                pageUrl = nextPageUrl,
+                roundNumber = current.roundNumber,
+                streak = current.streak,
+            )
+
             GameIntent.DismissError -> mutableState.update { it.copy(errorMessage = null) }
             GameIntent.BackClicked -> navigator.goBack()
         }
@@ -58,16 +80,41 @@ class GameViewModel(
         if (mutableState.value.isSolved) return
 
         if (currentQuestion.isCorrect(choice)) {
-            mutableState.update { it.copy(isSolved = true) }
+            solve()
         } else {
-            mutableState.update { it.copy(incorrectChoices = it.incorrectChoices + choice) }
+            // The streak resets the moment a guess is wrong, not at the end of the round: the
+            // player should see the cost immediately, next to the key that cost it.
+            mutableState.update {
+                it.copy(incorrectChoices = it.incorrectChoices + choice, streak = 0)
+            }
             effectChannel.trySend(GameEffect.WrongAnswerFeedback)
         }
     }
 
-    private fun loadQuestion(pageUrl: String?) {
+    private fun solve() {
+        val current = mutableState.value
+        // Only a first-and-only correct guess extends the streak. A round already spoiled by a
+        // wrong guess still counts as solved — it just doesn't count towards the run.
+        val streak = if (current.incorrectChoices.isEmpty()) current.streak + 1 else 0
+        val solveSeconds = (currentTime.currentEpochSeconds() - roundStartedAt)
+            .toInt()
+            .coerceAtLeast(0)
+
+        // Outside the update block on purpose: update takes a lambda it may re-run, and a persisted
+        // write is not something to run twice.
+        bestStreakStore.record(streak)
+
         mutableState.update {
-            GameState(isLoading = true)
+            it.copy(isSolved = true, streak = streak, solveSeconds = solveSeconds)
+        }
+    }
+
+    private fun loadQuestion(pageUrl: String?, roundNumber: Int, streak: Int) {
+        // A fresh GameState rather than a copy: everything about the previous round — the ruled-out
+        // names, the reveal, the error — has to go, and listing what to clear is how one gets left
+        // behind. The two counters that outlive a round are passed back in explicitly.
+        mutableState.update {
+            GameState(isLoading = true, roundNumber = roundNumber, streak = streak)
         }
         operation(
             fallbackMessage = "Could not load a Pokemon",
@@ -81,12 +128,15 @@ class GameViewModel(
                 val loaded = getPokemonQuestion(pageUrl).bind()
                 question = loaded
                 nextPageUrl = loaded.nextPageUrl
+                roundStartedAt = currentTime.currentEpochSeconds()
                 mutableState.update {
                     it.copy(
                         isLoading = false,
                         artworkUrl = loaded.artworkUrl,
                         choices = loaded.choices,
                         answerName = loaded.answerName,
+                        pokedexNumber = loaded.pokedexNumber,
+                        types = loaded.types,
                     )
                 }
             }

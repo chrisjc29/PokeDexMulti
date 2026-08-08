@@ -54,11 +54,7 @@ kotlin {
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
-            // ScreenScaffold's back arrow. CMP 1.11's material3 no longer carries the core Icons
-            // set, so without this `Icons.AutoMirrored.Filled.ArrowBack` does not resolve.
-            implementation(compose.materialIconsExtended)
             implementation(compose.ui)
-            implementation(compose.components.resources)
             // The @Preview annotation. NOT compose.components.uiToolingPreview, which supplies the
             // JetBrains annotation deprecated in CMP 1.10.
             implementation(libs.compose.ui.tooling.preview)
@@ -126,7 +122,6 @@ kotlin {
                 implementation(libs.koin.android)
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.androidx.compose.ui.tooling.preview)
-                implementation(libs.androidx.lifecycle.runtime.compose)
 
                 // Firebase deps only when enabled (BOM-managed).
                 if (firebaseEnabled) {
@@ -199,8 +194,6 @@ kover {
                     // lines measures which source set compiled, not whether anything is tested.
                     "com.unomaster.pokedexgame.analytics",
                     "com.unomaster.pokedexgame.time",
-                    // Compose Resources' generated accessor objects.
-                    "pokedexgame.composeapp.generated.resources",
                 )
                 classes(
                     "com.unomaster.pokedexgame.*Screen*",

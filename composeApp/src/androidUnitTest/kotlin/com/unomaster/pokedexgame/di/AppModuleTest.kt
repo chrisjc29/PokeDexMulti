@@ -3,6 +3,7 @@ package com.unomaster.pokedexgame.di
 import com.unomaster.pokedexgame.analytics.Analytics
 import com.unomaster.pokedexgame.analytics.CrashReporter
 import com.unomaster.pokedexgame.data.local.KeyValueStore
+import com.unomaster.pokedexgame.domain.time.CurrentTimeProvider
 import com.unomaster.pokedexgame.navigation.AppNavigator
 import io.ktor.client.engine.HttpClientEngine
 import org.koin.test.verify.verify
@@ -23,6 +24,7 @@ class AppModuleTest {
                 Analytics::class,
                 CrashReporter::class,
                 KeyValueStore::class,
+                CurrentTimeProvider::class,
                 AppNavigator::class,
             ),
         )
