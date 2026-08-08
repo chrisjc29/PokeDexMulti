@@ -12,11 +12,6 @@ import androidx.compose.ui.graphics.Color
 // `primary` would mean restyling the app restyles the pokeball.
 @Immutable
 data class AppColors(
-    val success: Color,
-    val warning: Color,
-    val onWarning: Color,
-    val divider: Color,
-    val scrim: Color,
     val pokeballRed: Color,
     val pokeballShell: Color,
     val pokeballOutline: Color,
@@ -60,11 +55,6 @@ data class AppColors(
 )
 
 val LightAppColors = AppColors(
-    success = Color(0xFF16A34A),
-    warning = Color(0xFFF59E0B),
-    onWarning = Color(0xFF1F2937),
-    divider = Color(0xFFE1E4ED),
-    scrim = Color(0x99000000),
     pokeballRed = Color(0xFFEE1515),
     pokeballShell = Color(0xFFFFFFFF),
     pokeballOutline = Color(0xFF1B1B1B),
@@ -98,11 +88,6 @@ val LightAppColors = AppColors(
 )
 
 val DarkAppColors = AppColors(
-    success = Color(0xFF4ADE80),
-    warning = Color(0xFFFBBF24),
-    onWarning = Color(0xFF1F2937),
-    divider = Color(0xFF2C3140),
-    scrim = Color(0xB3000000),
     pokeballRed = Color(0xFFEE1515),
     pokeballShell = Color(0xFFF2F2F2),
     pokeballOutline = Color(0xFF0B0B0B),

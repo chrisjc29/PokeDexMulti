@@ -46,6 +46,18 @@ composeApp/google-services.json
 iosApp/iosApp/GoogleService-Info.plist
 # The *.PLACEHOLDER files ARE committed — they document what to drop in.
 
+# --- Firebase CLI / emulator logs ---
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+
+# --- Fastlane run output (the lane config IS committed, its reports are not) ---
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
 # --- OS noise ---
 .DS_Store
 Thumbs.db
