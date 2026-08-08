@@ -87,9 +87,8 @@ sit off the 4dp grid on purpose — 9dp key gaps, 13dp lights, 3dp bezels — be
 hardware, not layout.
 
 `Motion`: `DurationScanSweep` 2600 (the sweep, `FastOutSlowInEasing`), `DurationSpin` 1400 (linear),
-`DurationShake` 350, `DurationReveal` 300, `DurationKeyPress` 120, `DurationGlow` 150. The first two
-are ambient — the machine saying it is working — which is why they are far longer than the UI
-durations above them.
+`DurationShake` 350, `DurationReveal` 300. The first two are ambient — the machine saying it is
+working — which is why they are far longer than the two that react to a guess.
 
 ---
 

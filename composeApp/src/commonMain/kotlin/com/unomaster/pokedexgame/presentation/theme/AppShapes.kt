@@ -16,8 +16,6 @@ val AppShapes = Shapes(
 // writing RoundedCornerShape(50) inline, so a design change lands in one place.
 object AppRadius {
     val Pill = RoundedCornerShape(percent = 50)
-    val Card = RoundedCornerShape(12.dp)
-    val BottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 }
 
 // The Pokedex device's own shapes. The case corner is deliberately asymmetric — the larger
