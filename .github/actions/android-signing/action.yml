@@ -1,0 +1,124 @@
+name: Android release signing
+description: >
+  Decode the release keystore from a base64 secret and prove all four signing credentials work
+  before anything expensive runs. Used by the Firebase App Distribution workflow, and ready for any
+  later workflow that produces a signed artifact.
+
+  Nothing here is required to ship: without the ANDROID_* secrets the distribution workflow skips
+  this action entirely and builds the debug variant, which is signed with the debug key and still
+  installable. Set the secrets and the same workflow starts producing signed release builds.
+
+inputs:
+  keystore-base64:
+    description: base64 of the release keystore
+    required: true
+  keystore-password:
+    description: Keystore password
+    required: true
+  key-alias:
+    description: Key alias
+    required: true
+  key-password:
+    description: Key password (equal to the store password on a PKCS12 keystore)
+    required: true
+
+outputs:
+  keystore-path:
+    description: Absolute path to the decoded keystore on the runner
+    value: ${{ steps.restore.outputs.keystore-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore release keystore
+      id: restore
+      env:
+        ANDROID_KEYSTORE_BASE64: ${{ inputs.keystore-base64 }}
+      shell: bash
+      run: |
+        set -uo pipefail
+        printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
+        # The identity of the decoded file, so it can be compared against the keystore that signs
+        # locally: shasum -a 256 <your.jks>. A hash of the file gives away nothing - what is secret
+        # about a keystore is the passwords - and it is the only way to tell "the secret holds a
+        # different keystore" apart from "the secret holds this keystore, damaged", which look
+        # identical from every error message keytool produces.
+        echo "keystore: $(wc -c < "$RUNNER_TEMP/release.keystore") bytes"
+        echo "sha256:   $(sha256sum "$RUNNER_TEMP/release.keystore" | cut -d' ' -f1)"
+
+        # Reported rather than left for the caller to reconstruct, so the path exists in exactly one
+        # place. A workflow that hardcodes ${{ runner.temp }}/release.keystore and an action that
+        # writes somewhere else fail at signing time with a missing-file error.
+        echo "keystore-path=$RUNNER_TEMP/release.keystore" >> "$GITHUB_OUTPUT"
+
+    # Three seconds here, or six minutes into the build.
+    #
+    # A wrong signing credential does not surface until PackageAndroidArtifact tries to sign the
+    # APK, which is after the entire Kotlin and Android build has run. Worse, it surfaces as "Given
+    # final block not properly padded", which reads like a corrupt keystore rather than a wrong
+    # password - so the natural next move is to regenerate the base64 secret, which is not the
+    # problem. These checks isolate which credential is at fault before anything expensive starts,
+    # and print what keytool actually said rather than substituting a guess for it.
+    - name: Verify the signing credentials
+      env:
+        ANDROID_KEYSTORE_PASSWORD: ${{ inputs.keystore-password }}
+        ANDROID_KEY_ALIAS: ${{ inputs.key-alias }}
+        ANDROID_KEY_PASSWORD: ${{ inputs.key-password }}
+      shell: bash
+      run: |
+        set -uo pipefail
+        KEYSTORE="$RUNNER_TEMP/release.keystore"
+
+        # Lengths and an equality flag, never the values. A secret pasted with a trailing newline
+        # looks correct in the settings UI, survives intact into the runner, and fails only the
+        # third check below - so these two numbers are the one cheap way to see it.
+        echo "store password: ${#ANDROID_KEYSTORE_PASSWORD} chars, key password: ${#ANDROID_KEY_PASSWORD} chars"
+        if [ "$ANDROID_KEYSTORE_PASSWORD" = "$ANDROID_KEY_PASSWORD" ]; then
+          echo "the two passwords are byte-identical"
+        else
+          echo "the two passwords differ - correct for a JKS keystore, wrong for a PKCS12 one"
+        fi
+        keytool -version || true
+
+        if ! output=$(keytool -list -keystore "$KEYSTORE" \
+                      -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>&1); then
+          echo "$output"
+          echo "::error::The keystore did not open. Either ANDROID_KEYSTORE_BASE64 decoded to something that is not a keystore, or ANDROID_KEYSTORE_PASSWORD is wrong. keytool's own output is above."
+          exit 1
+        fi
+
+        if ! output=$(keytool -list -keystore "$KEYSTORE" -alias "$ANDROID_KEY_ALIAS" \
+                      -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>&1); then
+          echo "$output"
+          echo "::error::That alias is not in the keystore. Check ANDROID_KEY_ALIAS against: keytool -list -keystore <your.jks>"
+          exit 1
+        fi
+
+        # What kind of entry this is and what algorithm the key uses, printed unconditionally.
+        # Certificate metadata only - no key material, nothing secret. It is here because the check
+        # below can fail for reasons that are invisible without it: a trustedCertEntry has no
+        # private key to read at all, and an EC key sends keytool looking for a default signature
+        # algorithm it may not have.
+        keytool -list -v -keystore "$KEYSTORE" -alias "$ANDROID_KEY_ALIAS" \
+                -storepass "$ANDROID_KEYSTORE_PASSWORD" 2>&1 |
+          grep -Ei "Keystore type|Entry type|Algorithm|Signature algorithm" || true
+
+        # The store opens and the alias exists, so what is left is the private key itself.
+        # -certreq is the only non-destructive keytool operation that decrypts it: -list reads the
+        # certificate and ignores -keypass entirely, so it cannot tell you anything here.
+        #
+        # -file sends the CSR to a file rather than stdout. The obvious alternative - discarding
+        # stdout and capturing stderr - silently eats the diagnosis, because keytool prints its
+        # errors on stdout.
+        if ! output=$(keytool -certreq -alias "$ANDROID_KEY_ALIAS" -keystore "$KEYSTORE" \
+                      -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+                      -keypass "$ANDROID_KEY_PASSWORD" \
+                      -file "$RUNNER_TEMP/preflight.csr" 2>&1); then
+          echo "${output:-(keytool exited $? without printing anything)}"
+          echo "::error::The private key could not be read - keytool's reason is above, and it decides this, not the wording of this message. FIRST compare the sha256 printed by the Restore step against 'shasum -a 256 <the keystore you sign with locally>': a block-padding complaint from a store that opened cleanly usually means ANDROID_KEYSTORE_BASE64 holds a DIFFERENT keystore, which has its own key password and gives no other sign of being the wrong file. Only if the hashes match is ANDROID_KEY_PASSWORD itself suspect. 'Alias has no key' means the entry is a certificate, not a keypair."
+          exit 1
+        fi
+        rm -f "$RUNNER_TEMP/preflight.csr"
+
+        echo "Signing credentials verified: keystore opens, alias exists, key decrypts."

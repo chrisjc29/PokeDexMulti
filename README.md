@@ -192,20 +192,35 @@ Three test-infrastructure facts worth knowing before you add tests:
   `graphicsMode=NATIVE` (Compose draws through Skia — the legacy mode yields empty canvases), and a
   `w480dp-h1600dp` display, because Robolectric's 320x470dp default pushes content below the fold.
 
-## Release builds
+## CI and release builds
+
+Two GitHub workflows, both thin triggers around a Fastlane lane so the same checks run locally:
+
+| Workflow | Fires on | Does |
+| --- | --- | --- |
+| `ci.yml` | PRs to `main`, pushes to `main` | Compiles, runs the suite, verifies the goldens, checks coverage |
+| `android-firebase-distribution.yml` | `android-v*` tags, manual | Builds an APK and ships it to Firebase App Distribution |
+
+```bash
+bundle exec fastlane android ci           # exactly what CI runs
+bundle exec fastlane android screenshots  # re-record the Roborazzi goldens
+bundle exec fastlane android beta         # build, then upload to App Distribution ("testers")
+bundle exec fastlane ios ci               # compile the Kotlin/Native framework
+```
+
+Push an `android-v1.0.1` tag and testers get that build. The tag is the single source of truth for
+the version: Fastlane derives `versionName` `1.0.1` and `versionCode` `10000010` from it and passes
+them to Gradle as `-PversionCode` / `-PversionName`, which default to `1` / `1.0` without them. An
+untagged distribution run is refused rather than shipped.
 
 Signing is read from `keystore.properties` (git-ignored — copy `keystore.properties.PLACEHOLDER`) or,
 in CI, from `ANDROID_KEYSTORE_FILE` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` /
-`ANDROID_KEY_PASSWORD`. If neither is present the release build is simply left unsigned, so debug
-builds, tests and CI checks keep working with no secrets. `versionCode` / `versionName` come from
-Gradle properties (`-PversionCode=…`), defaulting to `1` / `1.0`.
+`ANDROID_KEY_PASSWORD`. If neither is present the release build is left unsigned — so debug builds,
+tests and CI checks keep working with no secrets, and the distribution lane builds the *debug*
+variant instead, since an unsigned release APK cannot be installed.
 
-Fastlane (Ruby, via `bundle install`) has two Android lanes:
-
-```bash
-bundle exec fastlane android build   # :composeApp:assemble, Debug
-bundle exec fastlane android beta    # build, then upload to Firebase App Distribution ("testers")
-```
+See **[DISTRIBUTION.md](DISTRIBUTION.md)** for the secrets each workflow needs and how to switch to
+signed release builds.
 
 ## Versions
 
