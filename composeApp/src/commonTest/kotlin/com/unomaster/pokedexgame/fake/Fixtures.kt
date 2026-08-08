@@ -12,11 +12,15 @@ fun pokemonQuestion(
     artworkUrl: String = "https://example.test/pikachu.png",
     choices: List<String> = listOf("Bulbasaur", "Charmander", "Squirtle", "Pikachu"),
     nextPageUrl: String? = "https://example.test/pokemon?offset=20",
+    pokedexNumber: Int = 25,
+    types: List<String> = listOf("Electric"),
 ) = PokemonQuestion(
     answerName = answerName,
     artworkUrl = artworkUrl,
     choices = choices,
     nextPageUrl = nextPageUrl,
+    pokedexNumber = pokedexNumber,
+    types = types,
 )
 
 fun pokemonPageDto(
@@ -31,6 +35,7 @@ fun pokemonDetailDto(
     id: Int = 1,
     name: String = "bulbasaur",
     artworkUrl: String = "https://example.test/bulbasaur.png",
+    types: List<String> = listOf("grass"),
 ) = PokemonDetailDto(
     id = id,
     name = name,
@@ -41,4 +46,7 @@ fun pokemonDetailDto(
             ),
         ),
     ),
+    types = types.map {
+        PokemonDetailDto.TypeSlot(type = PokemonDetailDto.TypeSlot.Type(name = it))
+    },
 )

@@ -1,5 +1,6 @@
 package com.unomaster.pokedexgame.di
 
+import com.unomaster.pokedexgame.data.local.BestStreakStore
 import com.unomaster.pokedexgame.data.random.KotlinRandomSource
 import com.unomaster.pokedexgame.data.remote.KtorPokemonRemoteSource
 import com.unomaster.pokedexgame.data.remote.PokemonRemoteSource
@@ -24,6 +25,9 @@ val appModule = module {
     // Data layer
     singleOf(::KtorPokemonRemoteSource) bind PokemonRemoteSource::class
     singleOf(::PokemonRepositoryImpl) bind PokemonRepository::class
+    // Reads and writes the one number that outlives a session. Wraps the platform KeyValueStore
+    // from platformModule.
+    singleOf(::BestStreakStore)
     // Randomness is injected for the same reason the clock is — see RandomSource.
     single { KotlinRandomSource() } bind RandomSource::class
 
