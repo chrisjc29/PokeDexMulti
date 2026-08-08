@@ -12,6 +12,7 @@ import com.unomaster.pokedexgame.presentation.game.GameState
 import com.unomaster.pokedexgame.presentation.theme.AppTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -26,11 +27,13 @@ class GameContentComponentTest {
         answerName = "Pikachu",
     )
 
+    // The keys are stamped in upper case, but the intent still carries the name as the model spells
+    // it. Both halves of that are asserted here, because getting one of them wrong is silent.
     @Test
     fun showsEveryChoice_whileUnsolved() = runComposeUiTest {
         setContent { AppTheme { GameContent(state = playingState, onIntent = {}) } }
 
-        playingState.choices.forEach { onNodeWithText(it).assertIsDisplayed() }
+        playingState.choices.forEach { onNodeWithText(it.uppercase()).assertIsDisplayed() }
     }
 
     @Test
@@ -38,33 +41,111 @@ class GameContentComponentTest {
         var lastIntent: GameIntent? = null
         setContent { AppTheme { GameContent(state = playingState, onIntent = { lastIntent = it }) } }
 
-        onNodeWithText("Squirtle").performClick()
+        onNodeWithText("SQUIRTLE").performClick()
         // v2 queues dispatched work; an assertion on a raw variable needs an explicit sync point.
         waitForIdle()
 
         assertEquals(GameIntent.ChoiceSelected("Squirtle"), lastIntent)
     }
 
+    // A ruled-out key stays legible — the player has earned that information — but it is dead.
     @Test
-    fun solvedRound_revealsTheNameAndOffersAnotherRound() = runComposeUiTest {
+    fun ruledOutChoice_staysVisibleButEmitsNothing() = runComposeUiTest {
         var lastIntent: GameIntent? = null
         setContent {
             AppTheme {
                 GameContent(
-                    state = playingState.copy(isSolved = true),
+                    state = playingState.copy(incorrectChoices = setOf("Charmander")),
                     onIntent = { lastIntent = it },
                 )
             }
         }
 
-        onNodeWithText("It's Pikachu!").assertIsDisplayed()
+        onNodeWithText("CHARMANDER").assertIsDisplayed()
+        onNodeWithText("CHARMANDER").performClick()
+        waitForIdle()
+
+        assertNull(lastIntent)
+    }
+
+    @Test
+    fun wrongGuess_reportsHowManyOptionsAreLeft() = runComposeUiTest {
+        setContent {
+            AppTheme {
+                GameContent(
+                    state = playingState.copy(incorrectChoices = setOf("Charmander")),
+                    onIntent = {},
+                )
+            }
+        }
+
+        onNodeWithText("NO MATCH · 2 LEFT").assertIsDisplayed()
+    }
+
+    @Test
+    fun solvedRound_revealsTheDexEntryAndOffersAnotherRound() = runComposeUiTest {
+        var lastIntent: GameIntent? = null
+        setContent {
+            AppTheme {
+                GameContent(
+                    state = playingState.copy(
+                        isSolved = true,
+                        streak = 4,
+                        pokedexNumber = 25,
+                        types = listOf("Electric"),
+                        solveSeconds = 4,
+                    ),
+                    onIntent = { lastIntent = it },
+                )
+            }
+        }
+
+        onNodeWithText("PIKACHU").assertIsDisplayed()
+        onNodeWithText("ELECTRIC").assertIsDisplayed()
+        onNodeWithText("NO. 025").assertIsDisplayed()
         // The choices are gone once the round is over — leaving them would invite a tap that
         // silently does nothing.
-        onNodeWithText("Bulbasaur").assertDoesNotExist()
+        onNodeWithText("BULBASAUR").assertDoesNotExist()
 
-        onNodeWithText("Play again").performClick()
+        onNodeWithText("NEXT SPECIMEN").performClick()
         waitForIdle()
         assertEquals(GameIntent.PlayAgain, lastIntent)
+    }
+
+    @Test
+    fun solvedRound_readsBackTheTimeAndStreak() = runComposeUiTest {
+        setContent {
+            AppTheme {
+                GameContent(
+                    state = playingState.copy(isSolved = true, streak = 4, solveSeconds = 4),
+                    onIntent = {},
+                )
+            }
+        }
+
+        onNodeWithText("Identified in 4 seconds. Streak now 4 — a wrong guess resets it.")
+            .assertIsDisplayed()
+    }
+
+    // Solving after a wrong guess is still a solve; the copy just doesn't pretend a run survived.
+    @Test
+    fun solvedRoundWithABrokenStreak_saysSo() = runComposeUiTest {
+        setContent {
+            AppTheme {
+                GameContent(
+                    state = playingState.copy(
+                        isSolved = true,
+                        incorrectChoices = setOf("Charmander"),
+                        streak = 0,
+                        solveSeconds = 9,
+                    ),
+                    onIntent = {},
+                )
+            }
+        }
+
+        onNodeWithText("Identified in 9 seconds. Streak reset — the next clean round starts a new one.")
+            .assertIsDisplayed()
     }
 
     @Test
@@ -79,10 +160,29 @@ class GameContentComponentTest {
             }
         }
 
+        onNodeWithText("SIGNAL LOST").assertIsDisplayed()
         onNodeWithText("Network unreachable").assertIsDisplayed()
-        onNodeWithText("Try again").performClick()
+        onNodeWithText("RETRY").performClick()
         waitForIdle()
 
         assertEquals(GameIntent.Retry, lastIntent)
+    }
+
+    @Test
+    fun errorState_offersDismiss() = runComposeUiTest {
+        var lastIntent: GameIntent? = null
+        setContent {
+            AppTheme {
+                GameContent(
+                    state = GameState(errorMessage = "Network unreachable"),
+                    onIntent = { lastIntent = it },
+                )
+            }
+        }
+
+        onNodeWithText("DISMISS").performClick()
+        waitForIdle()
+
+        assertEquals(GameIntent.DismissError, lastIntent)
     }
 }

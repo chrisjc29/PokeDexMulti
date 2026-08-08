@@ -19,3 +19,27 @@ object AppRadius {
     val Card = RoundedCornerShape(12.dp)
     val BottomSheet = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 }
+
+// The Pokedex device's own shapes. The case corner is deliberately asymmetric — the larger
+// bottom-end radius is what stops the red panel reading as a card and starts it reading as moulded
+// plastic — so it cannot be expressed by one of Material's symmetric slots.
+object DeviceShapes {
+    val Case = RoundedCornerShape(
+        topStart = 12.dp,
+        topEnd = 12.dp,
+        bottomEnd = 26.dp,
+        bottomStart = 12.dp,
+    )
+
+    // The loading and error screens run a slightly tighter casing, matching their smaller chrome.
+    val CaseCompact = RoundedCornerShape(
+        topStart = 12.dp,
+        topEnd = 12.dp,
+        bottomEnd = 24.dp,
+        bottomStart = 12.dp,
+    )
+
+    val Screen = RoundedCornerShape(8.dp)
+    val Key = RoundedCornerShape(10.dp)
+    val PrimaryKey = RoundedCornerShape(12.dp)
+}

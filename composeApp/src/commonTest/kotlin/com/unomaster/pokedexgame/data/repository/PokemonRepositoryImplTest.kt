@@ -39,6 +39,35 @@ class PokemonRepositoryImplTest {
         assertEquals("https://example.test/pokemon?offset=20", question.nextPageUrl)
     }
 
+    // The dex entry's two fields come off the same detail response as the artwork, and the type
+    // names arrive as lowercase slugs, so the mapping is worth asserting rather than assuming.
+    @Test
+    fun carriesTheDexNumberAndTypesFromTheDetail() = runTest {
+        val remoteSource = FakePokemonRemoteSource(
+            detail = pokemonDetailDto(id = 25, types = listOf("electric", "flying")),
+        )
+
+        val question = repository(remoteSource = remoteSource)
+            .getQuestion(pageUrl = null)
+            .getOrNull()!!
+
+        assertEquals(25, question.pokedexNumber)
+        assertEquals(listOf("Electric", "Flying"), question.types)
+    }
+
+    // A payload without a types array still has to produce a playable round: the label is a
+    // nice-to-have, and failing the whole load over it would show the player "couldn't connect".
+    @Test
+    fun missingTypes_stillBuildsARound() = runTest {
+        val remoteSource = FakePokemonRemoteSource(detail = pokemonDetailDto(types = emptyList()))
+
+        val question = repository(remoteSource = remoteSource)
+            .getQuestion(pageUrl = null)
+            .getOrNull()!!
+
+        assertEquals(emptyList(), question.types)
+    }
+
     @Test
     fun fetchesTheDetailOfThePickedEntry() = runTest {
         val remoteSource = FakePokemonRemoteSource()

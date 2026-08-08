@@ -7,6 +7,10 @@ data class PokemonQuestion(
     val artworkUrl: String,
     val choices: List<String>,
     val nextPageUrl: String?,
+    // The dex entry shown once the round is solved. Both come from the same detail response as the
+    // artwork, so they cost nothing extra to carry.
+    val pokedexNumber: Int,
+    val types: List<String>,
 ) {
     // The rule that decides a round, kept with the data it judges rather than in the ViewModel.
     fun isCorrect(choice: String): Boolean = choice.equals(answerName, ignoreCase = true)

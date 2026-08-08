@@ -44,6 +44,8 @@ class PokemonRepositoryImpl(
                 artworkUrl = detail.sprites.other.officialArtwork.frontDefault,
                 choices = randomSource.shuffled(decoyNames + answerName),
                 nextPageUrl = page.next,
+                pokedexNumber = detail.id,
+                types = detail.types.map { it.type.name.toDisplayName() },
             )
         }
 
