@@ -6,6 +6,14 @@ MVI loop and the request sequence live in the [README](../README.md).
 Where these diagrams and the code disagree, **the code wins** — fix the diagram, and see the
 regeneration table at the bottom for which one to redraw.
 
+**Reading the colours.** The layer palette is the same one the README uses: 🔵 presentation ·
+🟢 domain · 🟠 data · ⚪ dashed grey cross-cutting · 🔴 failure path. Three diagrams here are not
+about layers — source sets, the route stack and the test tiers — so they re-use the same three hues
+with their own meaning, stated under each. Grouping and labels carry the same information, so none
+of it depends on seeing colour. The hues are fixed hex rather than theme-aware, chosen to clear
+contrast and colour-blind separation against **both** GitHub's light and dark surfaces; node text is
+left to the theme so it stays legible either way.
+
 ## Source sets and the Firebase variants
 
 One shared module, `composeApp`, which is both the shared KMP code *and* the Android application.
@@ -31,7 +39,18 @@ flowchart BT
     FB -->|"firebase.enabled = true"| AND
     NOFB -->|"firebase.enabled = false"| AND
     IOSAPP -->|"links ComposeApp.framework"| IOS
+
+    classDef shared fill:#8b949e1f,stroke:#8b949e,stroke-width:2px
+    classDef android fill:#199e7022,stroke:#199e70,stroke-width:2px
+    classDef ios fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef test fill:#d9592622,stroke:#d95926,stroke-width:2px
+    class COMMON shared
+    class AND,FB,NOFB android
+    class IOS,IOSAPP ios
+    class CT,AUT test
 ```
+
+Here the coding is by **target**, not by layer: 🟢 Android · 🔵 iOS · 🟠 test · ⚪ shared.
 
 On iOS the Kotlin side never links the Firebase SDK at all: `IosAnalytics` and `IosCrashReporter`
 call the `AnalyticsBridge` / `CrashReporterBridge` interfaces, which Swift implements in `iosApp`.
@@ -48,6 +67,11 @@ flowchart LR
     DISPLAY -->|"entryDecorators<br/>SaveableStateHolder · ViewModelStore"| ENTRY["NavEntry per AppRoute"]
     ENTRY --> SCREENS["Screen composables"]
     NAVMOD["navigationModule<br/>navigation&lt;Route&gt; { }"] -. "registers" .-> ENTRY
+
+    classDef pres fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
+    class VM,SCREENS pres
+    class NAVI,DISPLAY,ENTRY,NAVMOD infra
 ```
 
 `Navigator` is bound to **both** `Navigator` and `AppNavigator` in `navigationModule`: the nav host
@@ -63,7 +87,14 @@ stateDiagram-v2
     Home --> Settings: SettingsClicked
     Game --> Home: BackClicked
     Settings --> Home: BackClicked
+
+    classDef top fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef pushed fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px
+    class Home top
+    class Game,Settings pushed
 ```
+
+🔵 is the one route with `isTopLevel = true`; the grey pair are pushed onto the stack.
 
 `AppRoute.Home` is the only route with `isTopLevel = true`, so navigating to it clears the stack
 instead of piling destinations up. `Navigator.goBack()` refuses to pop the last entry — a double tap
@@ -96,6 +127,15 @@ flowchart TB
     PLATM --> ANA["Analytics · CrashReporter"]
     NAVM --> NAVIGATOR["Navigator<br/>bound as Navigator + AppNavigator"]
     NAVM --> ENTRIES["AppRoute to screen entries"]
+
+    classDef pres fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef dom fill:#199e7022,stroke:#199e70,stroke-width:2px
+    classDef dat fill:#d9592622,stroke:#d95926,stroke-width:2px
+    classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
+    class VMS pres
+    class UCS dom
+    class REPOS,RAND,HTTP,ENGINE,KVS dat
+    class INIT,APPM,PLATM,NAVM,CLOCK,ANA,NAVIGATOR,ENTRIES infra
 ```
 
 `platformModule` on Android does `includes(analyticsModule)`, which resolves to whichever variant
@@ -132,7 +172,15 @@ classDiagram
     DomainError <|-- NetworkUnavailable
     DomainError <|-- EmptyResponse
     DomainError <|-- Unexpected
+
+    style Unexpected fill:#e3494822,stroke:#e34948,stroke-width:2px
+    style NetworkUnavailable fill:#e3494822,stroke:#e34948,stroke-width:2px
+    style RateLimited fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px
+    style EmptyResponse fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px
+    style DomainError fill:#199e7022,stroke:#199e70,stroke-width:2px
 ```
+
+🔴 reaches the crash reporter; ⚪ never does — see the flow below.
 
 `Unexpected` is the deliberate escape hatch for genuine bugs: it carries the `Throwable` so crash
 reporting keeps the stack trace, while callers still only ever see a `DomainError`.
@@ -148,6 +196,13 @@ flowchart LR
     REC --> MSG["toUserMessage(fallback)"]
     SKIP --> MSG
     MSG --> STATE["state.errorMessage"]
+
+    classDef fail fill:#e3494822,stroke:#e34948,stroke-width:2px
+    classDef quiet fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
+    classDef pres fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    class LEFT,REC fail
+    class SKIP quiet
+    class MSG,STATE pres
 ```
 
 `network/NetworkCall.kt` is the only place a `Throwable` becomes a `Left`. Its `when` order is
@@ -173,7 +228,19 @@ flowchart TB
     subgraph SHOTS["Roborazzi — recordRoborazziDebug / verifyRoborazziDebug"]
         T8["one screenshot test generated per @Preview"]
     end
+
+    classDef logic fill:#199e7022,stroke:#199e70,stroke-width:2px
+    classDef ui fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef shot fill:#d9592622,stroke:#d95926,stroke-width:2px
+    class T1,T2,T3,T4 logic
+    class T5,T6,T7 ui
+    class T8 shot
+    style LOGIC fill:#199e700d,stroke:#199e70,stroke-width:1px
+    style UITIER fill:#3987e50d,stroke:#3987e5,stroke-width:1px
+    style SHOTS fill:#d959260d,stroke:#d95926,stroke-width:1px
 ```
+
+Coded by **tier**: 🟢 pure logic, no Compose · 🔵 Compose under Robolectric · 🟠 generated screenshots.
 
 The regression tier is generated, not written: **to cover a new screen state, add a `@Preview` for
 it**. Composables are excluded from coverage on purpose, so a screen without previews is a screen

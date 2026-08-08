@@ -37,6 +37,11 @@ implementing its contracts. Koin is the one thing that knows all three. The sing
 below: the ViewModels reach `BestStreakStore` directly, because one persisted integer never earned a
 domain repository.
 
+Colour means the same thing in every diagram here and in [docs/architecture.md](docs/architecture.md):
+🔵 **presentation** · 🟢 **domain** · 🟠 **data** · ⚪ dashed grey **cross-cutting** (Koin, platform,
+navigation plumbing) · 🔴 **failure path**. Every box is also grouped and labelled, so nothing is
+carried by colour alone.
+
 ```mermaid
 flowchart TB
     subgraph PRES["presentation"]
@@ -70,6 +75,18 @@ flowchart TB
     KOIN -. constructs .-> VMODEL
     KOIN -. constructs .-> USECASE
     KOIN -. constructs .-> REPO
+
+    classDef pres fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef dom fill:#199e7022,stroke:#199e70,stroke-width:2px
+    classDef dat fill:#d9592622,stroke:#d95926,stroke-width:2px
+    classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
+    class SCREEN,VMODEL pres
+    class USECASE,CONTRACT,MODEL,DERROR dom
+    class REPO,REMOTE,LOCAL,DTO dat
+    class KOIN infra
+    style PRES fill:#3987e50d,stroke:#3987e5,stroke-width:1px
+    style DOM fill:#199e700d,stroke:#199e70,stroke-width:1px
+    style DATA fill:#d959260d,stroke:#d95926,stroke-width:1px
 ```
 
 ### The MVI loop
@@ -94,13 +111,21 @@ flowchart LR
     VM -->|"GameEffect · Channel · fires once"| SCREEN
     VM -->|"navigate(route) · goBack()"| NAV
     SCREEN -->|"recomposes"| USER
+
+    classDef pres fill:#3987e522,stroke:#3987e5,stroke-width:2px
+    classDef dom fill:#199e7022,stroke:#199e70,stroke-width:2px
+    classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
+    class SCREEN,VM pres
+    class UC dom
+    class NAV,USER infra
 ```
 
 ### One round, both outcomes
 
 Expected failures are values, not exceptions. `network/NetworkCall.kt` is the only place a
 `Throwable` becomes a `Left`, and `bind()` short-circuits everything above it — note that the second
-request and the analytics event simply never run when the first one fails.
+request and the analytics event simply never run when the first one fails. The red band is the
+failure path.
 
 ```mermaid
 sequenceDiagram
@@ -121,23 +146,27 @@ sequenceDiagram
     REPO->>NET: fetchPage(pageUrl)
     NET->>API: GET a page of Pokemon
     alt page and detail both succeed
-        API-->>NET: 200 + JSON
-        NET-->>REPO: Right(PokemonPageDto)
-        REPO->>NET: fetchDetail(url of the random answer)
-        NET->>API: GET that Pokemon
-        API-->>NET: 200 + JSON
-        NET-->>REPO: Right(PokemonDetailDto)
-        REPO->>REPO: analytics.logEvent pokemon_question_loaded
-        REPO-->>UC: Right(PokemonQuestion)
-        UC-->>VM: Right, after ensure on the four choices
-        VM->>VM: state = artwork + choices, isLoading false
+        rect rgba(25, 158, 112, 0.12)
+            API-->>NET: 200 + JSON
+            NET-->>REPO: Right(PokemonPageDto)
+            REPO->>NET: fetchDetail(url of the random answer)
+            NET->>API: GET that Pokemon
+            API-->>NET: 200 + JSON
+            NET-->>REPO: Right(PokemonDetailDto)
+            REPO->>REPO: analytics.logEvent pokemon_question_loaded
+            REPO-->>UC: Right(PokemonQuestion)
+            UC-->>VM: Right, after ensure on the four choices
+            VM->>VM: state = artwork + choices, isLoading false
+        end
     else transport error, 429, or too few results
-        API-->>NET: failure
-        NET-->>REPO: Left(DomainError)
-        REPO-->>UC: Left, bind short-circuits
-        UC-->>VM: Left(DomainError)
-        VM->>VM: crashReporter, unless the server was just talking
-        VM->>VM: state = errorMessage via toUserMessage
+        rect rgba(227, 73, 72, 0.12)
+            API-->>NET: failure
+            NET-->>REPO: Left(DomainError)
+            REPO-->>UC: Left, bind short-circuits
+            UC-->>VM: Left(DomainError)
+            VM->>VM: crashReporter, unless the server was just talking
+            VM->>VM: state = errorMessage via toUserMessage
+        end
     end
     VM-->>S: StateFlow emits
     S-->>Player: recomposition
