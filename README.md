@@ -28,6 +28,125 @@ monospaced readouts. One round, start to finish:
   </tr>
 </table>
 
+<!-- cmp-diagrams:start -->
+## Architecture
+
+Clean layers, one shared Kotlin module. **Almost every arrow points inward** — `domain` imports
+nothing from `data`, `presentation` or any platform, and `data` depends on `domain` only by
+implementing its contracts. Koin is the one thing that knows all three. The single exception is drawn
+below: the ViewModels reach `BestStreakStore` directly, because one persisted integer never earned a
+domain repository.
+
+```mermaid
+flowchart TB
+    subgraph PRES["presentation"]
+        SCREEN["HomeScreen · GameScreen · SettingsScreen<br/>stateless Content composables"]
+        VMODEL["HomeViewModel · GameViewModel · SettingsViewModel<br/>State · Intent · Effect"]
+    end
+    subgraph DOM["domain"]
+        USECASE["GetPokemonQuestionUseCase"]
+        CONTRACT["PokemonRepository · RandomSource<br/>CurrentTimeProvider"]
+        MODEL["PokemonQuestion"]
+        DERROR["DomainError<br/>sealed interface"]
+    end
+    subgraph DATA["data"]
+        REPO["PokemonRepositoryImpl"]
+        REMOTE["KtorPokemonRemoteSource"]
+        LOCAL["BestStreakStore · KeyValueStore"]
+        DTO["PokemonPageDto · PokemonDetailDto"]
+    end
+    KOIN["Koin<br/>appModule · platformModule · navigationModule"]
+
+    SCREEN --> VMODEL
+    VMODEL --> USECASE
+    VMODEL -->|"best streak · no domain type"| LOCAL
+    USECASE --> CONTRACT
+    USECASE --> MODEL
+    USECASE --> DERROR
+    REPO -. implements .-> CONTRACT
+    REPO --> REMOTE
+    REMOTE --> DTO
+    DTO -. maps to .-> MODEL
+    KOIN -. constructs .-> VMODEL
+    KOIN -. constructs .-> USECASE
+    KOIN -. constructs .-> REPO
+```
+
+### The MVI loop
+
+A screen is a pure function of `State` plus an `onIntent` callback. All state lives in the ViewModel.
+Navigation is not an `Effect` — it goes straight through `AppNavigator`, because navigating is what
+the player asked for. `Effect` is reserved for genuinely one-shot things: the buzz on a wrong guess.
+
+```mermaid
+flowchart LR
+    USER(["Player"])
+    SCREEN["GameScreen"]
+    VM["GameViewModel"]
+    UC["GetPokemonQuestionUseCase"]
+    NAV["AppNavigator"]
+
+    USER -->|"taps a name"| SCREEN
+    SCREEN -->|"onIntent(GameIntent)"| VM
+    VM -->|"operation { either { } }"| UC
+    UC -->|"Either&lt;DomainError, PokemonQuestion&gt;"| VM
+    VM -->|"StateFlow&lt;GameState&gt;"| SCREEN
+    VM -->|"GameEffect · Channel · fires once"| SCREEN
+    VM -->|"navigate(route) · goBack()"| NAV
+    SCREEN -->|"recomposes"| USER
+```
+
+### One round, both outcomes
+
+Expected failures are values, not exceptions. `network/NetworkCall.kt` is the only place a
+`Throwable` becomes a `Left`, and `bind()` short-circuits everything above it — note that the second
+request and the analytics event simply never run when the first one fails.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Player
+    participant S as GameScreen
+    participant VM as GameViewModel
+    participant UC as GetPokemonQuestionUseCase
+    participant REPO as PokemonRepositoryImpl
+    participant NET as KtorPokemonRemoteSource
+    participant API as PokeAPI
+
+    Player->>S: tap PLAY AGAIN
+    S->>VM: onIntent(PlayAgain)
+    VM->>VM: state = GameState(isLoading = true)
+    VM->>UC: invoke(nextPageUrl)
+    UC->>REPO: getQuestion(pageUrl)
+    REPO->>NET: fetchPage(pageUrl)
+    NET->>API: GET a page of Pokemon
+    alt page and detail both succeed
+        API-->>NET: 200 + JSON
+        NET-->>REPO: Right(PokemonPageDto)
+        REPO->>NET: fetchDetail(url of the random answer)
+        NET->>API: GET that Pokemon
+        API-->>NET: 200 + JSON
+        NET-->>REPO: Right(PokemonDetailDto)
+        REPO->>REPO: analytics.logEvent pokemon_question_loaded
+        REPO-->>UC: Right(PokemonQuestion)
+        UC-->>VM: Right, after ensure on the four choices
+        VM->>VM: state = artwork + choices, isLoading false
+    else transport error, 429, or too few results
+        API-->>NET: failure
+        NET-->>REPO: Left(DomainError)
+        REPO-->>UC: Left, bind short-circuits
+        UC-->>VM: Left(DomainError)
+        VM->>VM: crashReporter, unless the server was just talking
+        VM->>VM: state = errorMessage via toUserMessage
+    end
+    VM-->>S: StateFlow emits
+    S-->>Player: recomposition
+```
+
+More diagrams — source sets, navigation, the Koin graph, the error model and the test tiers — are in
+[docs/architecture.md](docs/architecture.md).
+<!-- cmp-diagrams:end -->
+
 ## The feature, through every layer
 
 Three screens — **Home** (start), **Game** (the round), **Settings**. One round flows through the
