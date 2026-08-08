@@ -1,0 +1,150 @@
+name: CI
+
+# Pull requests targeting main, pushes to main, plus manual runs from the Actions tab.
+#
+# The distribution workflow fires only on android-v* tags, so without this file nothing compiles or
+# tests anything on a push - and composeApp/src/androidUnitTest/screenshots is a committed baseline
+# with nothing verifying it.
+#
+# `pull_request` is here because without it these checks would only ever run *after* a merge, which
+# makes main the place breakage is discovered rather than the place it is kept out of. A branch gets
+# the same verification the merge would.
+#
+# Documentation-only changes are excluded: a README edit cannot break a compile, a test or a golden.
+on:
+  pull_request:
+    # The default activity types are opened/synchronize/reopened, none of which fire when a draft is
+    # marked ready or when a label is added - and the two jobs below are gated on exactly those
+    # things. Without them a draft promoted to ready would sit there with no run at all, and adding
+    # the `ios` label would do nothing until the next push.
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - "LICENSE"
+  workflow_dispatch:
+
+# A second push supersedes the first: the older run is telling you about a commit nobody is looking
+# at any more, and macOS minutes are ten times the price of Linux ones. Keyed on the PR ref when
+# there is one, so successive pushes to a branch collapse to the newest rather than queueing.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android · compile, test, screenshots, coverage
+    runs-on: ubuntu-latest
+    # A draft pull request is a branch someone is still writing. Verifying it on every push is
+    # paying to be told about work that is not finished yet - the author already knows. Marking the
+    # PR ready for review is an event of its own, so the full run happens the moment the branch is
+    # offered for merge, which is the point at which the answer starts mattering.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Ruby (Fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      # Fastlane shells out to Gradle, so the build cache still pays for itself here.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The lane owns what "verified" means - compile, then the full suite with screenshot
+      # verification in a single pass, then coverage. Keeping it there rather than inlining gradle
+      # commands means the exact checks CI runs are reproducible locally with
+      # `bundle exec fastlane android ci`, and there is only one copy of them to keep correct.
+      - name: Run checks
+        run: bundle exec fastlane android ci
+
+      # The diff images are the entire value of a failed screenshot run - without them the log says
+      # only that something changed, and you are left guessing which pixel.
+      - name: Upload screenshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshot-diffs
+          path: |
+            composeApp/build/outputs/roborazzi/**/*_compare.png
+            composeApp/build/reports/roborazzi
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload test and coverage reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            composeApp/build/reports/tests
+            composeApp/build/test-results
+            composeApp/build/reports/kover
+          retention-days: 14
+          if-no-files-found: ignore
+
+  ios:
+    name: iOS · compile
+    # macos-14 is Apple Silicon, which is what iosSimulatorArm64 needs.
+    runs-on: macos-14
+    # The only job in this file billed at ten times the rate of the other, so it does not run per
+    # push. It runs on the merge to main, on demand, and on any pull request carrying the `ios`
+    # label - which is how a branch that is actually touching iosMain or iosApp opts back in to
+    # per-push feedback. Path filtering was the obvious alternative and does not work here:
+    # commonMain is compiled by Kotlin/Native too, so the honest path list is most of the repository.
+    #
+    # What this trades away is real: a commonMain change that breaks the Native compile is found on
+    # main rather than on the branch. Main is one run per merge, so it still surfaces within minutes
+    # and against a single commit.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'ios')
+    steps:
+      - uses: actions/checkout@v7
+
+      # The single biggest line item in this job. A cold runner downloads the Kotlin/Native compiler
+      # and its LLVM bundle - well over a gigabyte - before it compiles a line, and at the macOS
+      # rate that download is worth more than the build it enables. Keyed on the version catalogue
+      # because that is the file the Kotlin version lives in: bump Kotlin and the toolchain is
+      # genuinely different, change anything else and the cached one is still correct.
+      - name: Cache the Kotlin/Native toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: konan-${{ runner.os }}-
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Ruby (Fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # The least-verified code in the repo: the Kotlin/Native half of every expect/actual - the
+      # clock, the key-value store, the Ktor Darwin engine - which no other job can reach.
+      - name: Compile iOS framework
+        run: bundle exec fastlane ios ci
