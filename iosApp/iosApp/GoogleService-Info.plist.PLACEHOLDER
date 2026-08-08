@@ -1,0 +1,4 @@
+Replace this with the real GoogleService-Info.plist from your Firebase console
+(Project settings -> Your apps -> iOS app -> Download GoogleService-Info.plist),
+then add it to the Xcode project (drag into the iosApp target, "Copy if needed").
+Also uncomment the "ENABLE FIREBASE" blocks in iOSApp.swift and add the SPM packages.
