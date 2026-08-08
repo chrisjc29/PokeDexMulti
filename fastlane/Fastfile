@@ -50,12 +50,18 @@ end
 # The package the Firebase app id has to belong to - composeApp/build.gradle.kts's applicationId.
 ANDROID_PACKAGE_NAME = "com.unomaster.pokedexgame".freeze
 
-# Firebase Android app id, as previously hardcoded here. Kept only as a cross-check: the lane reads
-# the live value out of google-services.json (see firebase_android_app_id) rather than trusting this,
-# because the two are set from different places and a stale constant uploads a perfectly good build
-# to the wrong Firebase app - where it is invisible to the testers waiting for it, and reported as
-# success.
-EXPECTED_FIREBASE_APP_ID = "1:109281121087:android:040cc65fdb9040e3b7f98a".freeze
+# The Firebase Android app id we expect to be uploading to. Kept only as a cross-check: the lane
+# reads the live value out of google-services.json (see firebase_android_app_id) rather than
+# trusting this, because the two are set from different places and a stale constant uploads a
+# perfectly good build to the wrong Firebase app - where it is invisible to the testers waiting for
+# it, and reported as success.
+#
+# The project also still holds 1:109281121087:android:040cc65fdb9040e3b7f98a, registered against
+# com.unomaster.pokedexgame.android back when the Android app was its own Gradle module. The
+# restructure onto the single composeApp module dropped that suffix from applicationId and nothing
+# updated Firebase, so the google-services plugin had no client matching the package it was asked to
+# build - which is what the package check in firebase_android_app_id caught.
+EXPECTED_FIREBASE_APP_ID = "1:109281121087:android:6e0ee29901fc3a05b7f98a".freeze
 
 # Where the assembled APK lands, per build type. Named here because the beta lane has to hand
 # firebase_app_distribution an exact path, and a typo in one is only discovered after a full build.
