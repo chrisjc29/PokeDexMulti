@@ -10,7 +10,21 @@ data class PokemonDetailDto(
     @SerialName("id") val id: Int,
     @SerialName("name") val name: String,
     @SerialName("sprites") val sprites: Sprites,
+    // Defaulted rather than required: the type label is a nice-to-have on the solved screen, and a
+    // response that somehow arrives without it should still produce a playable round rather than a
+    // deserialization failure the player sees as "couldn't connect".
+    @SerialName("types") val types: List<TypeSlot> = emptyList(),
 ) {
+    @Serializable
+    data class TypeSlot(
+        @SerialName("type") val type: Type,
+    ) {
+        @Serializable
+        data class Type(
+            @SerialName("name") val name: String,
+        )
+    }
+
     @Serializable
     data class Sprites(
         @SerialName("other") val other: Other,
