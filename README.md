@@ -75,7 +75,7 @@ SDK-backed analytics; with it off it compiles a logcat no-op. Common code is ide
   - `androidUnitTest` — `component/`, `feature/`, the Koin graph test, and the committed Roborazzi
     goldens in `screenshots/`.
 - `iosApp/` — the SwiftUI host (`PokeDex.xcodeproj`).
-- `fastlane/` — moved to the repo root when the old `androidApp` module was folded into `composeApp`.
+- `fastlane/` — the release lanes, run from the repo root.
 
 ## Run on Android
 
@@ -126,8 +126,11 @@ Two test-infrastructure facts worth knowing before you add tests:
 
 The back stack lives in a Koin-owned `Navigator`. It survives configuration changes but **not process
 death** — Android may restore a backgrounded app at Home. That is accepted here: a three-screen game
-with no deep stack loses nothing but the current round. `navigation/AppNavConfig.kt` is generated and
-ready if you later want to persist it.
+with no deep stack loses nothing but the current round.
+
+If you ever do want to persist it, Nav3 falls back to reflection-based serialization for `NavKey`,
+and reflection does not exist on Kotlin/Native — so iOS needs a `SavedStateConfiguration` that
+registers the route hierarchy explicitly (`polymorphic(NavKey::class) { subclassesOfSealed<AppRoute>() }`).
 
 ## Versions
 
