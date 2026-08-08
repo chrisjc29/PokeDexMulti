@@ -1,0 +1,5 @@
+Only needed if you set firebase.enabled=true in gradle.properties.
+Replace this file with the real google-services.json from your Firebase console
+(Project settings -> Your apps -> Android app -> Download google-services.json),
+then rename it to exactly: google-services.json (in this composeApp/ directory).
+With firebase.enabled=false (the default) the build ignores this entirely.

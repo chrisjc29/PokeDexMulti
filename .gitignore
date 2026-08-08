@@ -1,0 +1,51 @@
+# --- Gradle / Kotlin ---
+.gradle/
+build/
+**/build/
+# don't ignore a source package literally named "build"
+!src/**/build/
+# Kotlin 2.x build services / KMP metadata cache
+.kotlin/
+*.iml
+*.hprof
+# machine-specific SDK paths — never commit
+local.properties
+
+# --- IDE (Android Studio / IntelliJ / Fleet / VS Code / Xcode) ---
+.idea/
+!.idea/copyright/
+.fleet/
+.vscode/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcuserdata/
+
+# --- Android ---
+*.apk
+*.aab
+*.ap_
+*.dex
+captures/
+.cxx/
+# signing secrets; the .PLACEHOLDER IS committed
+keystore.properties
+
+# --- iOS / Xcode / CocoaPods (if used) ---
+Pods/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# --- Roborazzi: goldens live in src/androidUnitTest/screenshots/ and ARE committed.
+#     Only the throwaway comparison/diff artifacts under build/ are ignored. ---
+**/build/outputs/roborazzi/
+
+# --- Firebase config: keep real keys out of git (only relevant when firebase.enabled=true) ---
+composeApp/google-services.json
+iosApp/iosApp/GoogleService-Info.plist
+# The *.PLACEHOLDER files ARE committed — they document what to drop in.
+
+# --- OS noise ---
+.DS_Store
+Thumbs.db
