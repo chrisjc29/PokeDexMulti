@@ -12,6 +12,41 @@
 
 require "json" # require_firebase_credentials! reads the service-account key to check its type.
 
+# Every repository path in this file is resolved against the root explicitly, never against the
+# working directory.
+#
+# fastlane's working directory during a lane is not a thing to build on. Run bare, `Dir.pwd` inside a
+# lane body is ./fastlane; inside the `gradle` action - which resolves ./gradlew relative to
+# project_dir - it behaved as the root on the CI runner. So `"composeApp/google-services.json"` and
+# `project_dir: "."` can both be correct, in the same run, in different frames. That cost a green
+# pipeline that failed at the first real distribution with "google-services.json is missing" while
+# the file sat in the workspace exactly where the workflow had written it.
+#
+# Walking up for settings.gradle.kts is deliberately not __dir__: a Fastfile is loaded through eval,
+# and __dir__ measured "." here rather than an absolute path, so anything derived from it is relative
+# to the very working directory this is trying not to depend on. It is kept only as a second seed.
+def repo_root
+  @repo_root ||= begin
+    seeds = [Dir.pwd]
+    seeds << File.expand_path("..", __dir__) if __dir__
+
+    found = seeds.flat_map { |seed| [seed, File.expand_path("..", seed)] }
+                 .uniq
+                 .find { |candidate| File.exist?(File.join(candidate, "settings.gradle.kts")) }
+
+    UI.user_error!("Could not find the repository root (no settings.gradle.kts above #{Dir.pwd}).") \
+      if found.nil?
+
+    found
+  end
+end
+
+# Absolute path to something in the repository. Takes the same repo-relative string that appears in
+# error messages and in the workflows, so the two cannot drift.
+def repo_path(relative)
+  File.join(repo_root, relative)
+end
+
 # The package the Firebase app id has to belong to - composeApp/build.gradle.kts's applicationId.
 ANDROID_PACKAGE_NAME = "com.unomaster.pokedexgame".freeze
 
@@ -50,18 +85,8 @@ CI_PROPERTIES = { "firebase.enabled" => "false" }.freeze
 # The release tag is the single source of truth. Off the pipeline it falls back to the committed
 # VERSION file, so a laptop build is identifiably a dev build of a known release line.
 def committed_version
-  # "VERSION" relative to the working directory, which is the repository root - the same convention
-  # every other path in this file uses ("composeApp/build/outputs/...").
-  #
-  # Deliberately not File.expand_path("../VERSION", __dir__) alone: a Fastfile is loaded through
-  # eval, so __dir__ depends on how fastlane resolved the path it was given, and when it comes out
-  # wrong the symptom is a silent fallback rather than an error. It is kept only as a second guess
-  # for the case where a lane is run from somewhere other than the root.
-  candidates = ["VERSION"]
-  candidates << File.expand_path("../VERSION", __dir__) if __dir__
-
-  path = candidates.find { |candidate| File.exist?(candidate) }
-  UI.user_error!("No VERSION file found (looked in: #{candidates.join(', ')})") if path.nil?
+  path = repo_path("VERSION")
+  UI.user_error!("No VERSION file at #{path}.") unless File.exist?(path)
 
   File.read(path).strip
 end
@@ -125,7 +150,7 @@ end
 # locally, or as GitHub secrets - and the same lane starts producing a real signed release build.
 def release_signing_configured?
   ENV["ANDROID_KEYSTORE_FILE"].to_s.strip != "" ||
-    File.exist?(File.join(Dir.pwd, "keystore.properties"))
+    File.exist?(repo_path("keystore.properties"))
 end
 
 # The Firebase app config, checked before the build rather than by Gradle's configuration phase.
@@ -140,13 +165,13 @@ def require_google_services!
   hint = "Download it from Firebase console -> Project settings -> Your apps -> Android, and put " \
          "it at #{GOOGLE_SERVICES_PATH} (it is gitignored). See DISTRIBUTION.md."
 
-  unless File.file?(GOOGLE_SERVICES_PATH)
+  unless File.file?(repo_path(GOOGLE_SERVICES_PATH))
     UI.user_error!(
       "#{GOOGLE_SERVICES_PATH} is missing, and this lane builds with firebase.enabled=true.\n#{hint}"
     )
   end
 
-  if File.size(GOOGLE_SERVICES_PATH).zero?
+  if File.size(repo_path(GOOGLE_SERVICES_PATH)).zero?
     UI.user_error!(
       "#{GOOGLE_SERVICES_PATH} is empty - the GOOGLE_SERVICES_JSON secret is probably unset.\n#{hint}"
     )
@@ -165,7 +190,7 @@ def firebase_android_app_id
   require_google_services!
 
   config = begin
-    JSON.parse(File.read(GOOGLE_SERVICES_PATH))
+    JSON.parse(File.read(repo_path(GOOGLE_SERVICES_PATH)))
   rescue JSON::ParserError
     UI.user_error!(
       "#{GOOGLE_SERVICES_PATH} is not valid JSON. If it came from the GOOGLE_SERVICES_JSON secret, " \
@@ -266,7 +291,7 @@ platform :android do
   lane :ci do
     gradle(
       task: ":composeApp:compileDebugKotlinAndroid",
-      project_dir: ".",
+      project_dir: repo_root,
       properties: CI_PROPERTIES,
       flags: "--stacktrace"
     )
@@ -276,14 +301,14 @@ platform :android do
     # runs every test and verifies the committed goldens in the same pass.
     gradle(
       task: ":composeApp:testDebugUnitTest",
-      project_dir: ".",
+      project_dir: repo_root,
       properties: CI_PROPERTIES.merge("roborazzi.test.verify" => "true"),
       flags: "--stacktrace"
     )
 
     gradle(
       task: "koverVerify",
-      project_dir: ".",
+      project_dir: repo_root,
       properties: CI_PROPERTIES,
       flags: "--stacktrace"
     )
@@ -293,7 +318,7 @@ platform :android do
   lane :screenshots do
     gradle(
       task: "recordRoborazziDebug",
-      project_dir: ".",
+      project_dir: repo_root,
       properties: CI_PROPERTIES,
       flags: "--stacktrace"
     )
@@ -325,14 +350,14 @@ platform :android do
       )
     end
 
-    gradle(task: "clean", project_dir: ".")
+    gradle(task: "clean", project_dir: repo_root)
 
     UI.message("Building Android #{release_version_name} (#{release_build_number}) [#{build_type}]")
 
     gradle(
       task: "assemble",
       build_type: build_type,
-      project_dir: ".",
+      project_dir: repo_root,
       properties: {
         # google-services / Crashlytics plugins only apply when this is true, and the androidFirebase
         # source set only compiles in when it is - so this is the only build that exercises the real
@@ -346,7 +371,7 @@ platform :android do
 
     firebase_app_distribution(
       app: app_id,
-      apk_path: ANDROID_APK_PATHS.fetch(build_type),
+      apk_path: repo_path(ANDROID_APK_PATHS.fetch(build_type)),
       # Create a "testers" group in Firebase console -> App Distribution -> Testers & Groups, or
       # override with FIREBASE_TESTER_GROUPS.
       groups: ENV["FIREBASE_TESTER_GROUPS"] || "testers",
@@ -371,7 +396,7 @@ platform :ios do
     # other target, so nothing else will catch a break in it.
     gradle(
       task: ":composeApp:compileKotlinIosSimulatorArm64",
-      project_dir: ".",
+      project_dir: repo_root,
       properties: CI_PROPERTIES,
       flags: "--stacktrace"
     )

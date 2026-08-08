@@ -230,8 +230,16 @@ val keystoreProperties = Properties().apply {
         keystorePropertiesFile.inputStream().use { load(it) }
     }
 }
+// Blank counts as absent, not as a value.
+//
+// Both sources hand back empty strings rather than nulls when nothing is configured: a GitHub
+// Actions `env:` entry whose expression resolved to nothing is set to "", and
+// keystore.properties.PLACEHOLDER ships with `storeFile=` on purpose. Either one made
+// hasReleaseSigning true, and `file("")` resolves to the project directory - so the release variant
+// was configured to sign itself with a directory, and failed at packaging with a message about the
+// keystore rather than about the missing configuration.
 fun signingValue(propKey: String, envKey: String): String? =
-    keystoreProperties.getProperty(propKey) ?: System.getenv(envKey)
+    (keystoreProperties.getProperty(propKey) ?: System.getenv(envKey))?.takeIf { it.isNotBlank() }
 val hasReleaseSigning = signingValue("storeFile", "ANDROID_KEYSTORE_FILE") != null
 
 android {
