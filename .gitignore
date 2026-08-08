@@ -49,3 +49,9 @@ iosApp/iosApp/GoogleService-Info.plist
 # --- OS noise ---
 .DS_Store
 Thumbs.db
+
+# --- Fastlane: report.xml and the plugin gem cache are regenerated on every lane run ---
+fastlane/report.xml
+fastlane/Preview.html
+vendor/bundle/
+.bundle/

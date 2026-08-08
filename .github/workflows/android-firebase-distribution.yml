@@ -1,0 +1,123 @@
+name: Android → Firebase App Distribution
+
+# Trigger on version tags like "android-v1.2.0", or manually from the Actions tab.
+#
+# The tag is what gives the build its identity: fastlane derives versionName and versionCode from it
+# and refuses to distribute without one, because an untagged build ships as "1.0.0-dev (1)" and
+# installs over a real release on a tester's device.
+on:
+  push:
+    tags:
+      - "android-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to build, e.g. android-v1.0.0. Blank builds the current ref, which the lane rejects unless allow_untagged is ticked."
+        required: false
+        type: string
+      allow_untagged:
+        description: "Build without a release tag, as a throwaway. Ships as <VERSION>-dev (1) — for testing this pipeline, not for testers."
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    steps:
+      # When dispatched with a release_tag, build that tag's commit rather than the branch head -
+      # otherwise the shipped code and the version stamped on it can come from different commits.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Ruby (Fastlane)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # This lane is the only build in the repo that runs with firebase.enabled=true, so it is the
+      # only one that needs the config file. It is gitignored, so it has to come from a secret.
+      - name: Restore Firebase config (google-services.json)
+        run: echo "$GOOGLE_SERVICES_JSON" > composeApp/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+
+      - name: Restore Firebase service account
+        run: echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      # Release signing is optional, and its absence is not an error.
+      #
+      # An unsigned release APK cannot be installed, so there is no useful "release build without a
+      # key" - the lane builds the debug variant instead, which is signed with the debug key and
+      # installs fine. That is the state this repo ships in today. Adding the four ANDROID_* secrets
+      # is the whole of the switch to signed release builds: this step starts finding them, the
+      # action below stops being skipped, and the lane sees ANDROID_KEYSTORE_FILE.
+      #
+      # `if` cannot test a secret directly (secrets are not available to expression contexts in an
+      # `if` on a step that has not been given them), hence the flag hop through an output.
+      - name: Detect release signing secrets
+        id: signing-secrets
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Release signing secrets found - building the signed release variant."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No ANDROID_KEYSTORE_BASE64 secret, so this run builds the DEBUG variant. It installs and runs; see DISTRIBUTION.md to switch to signed release builds."
+          fi
+
+      # Decodes the keystore and proves all four credentials work before the build starts, so a
+      # wrong password costs three seconds rather than six minutes. See the action for why each
+      # check exists.
+      - name: Restore and verify release signing
+        id: signing
+        if: steps.signing-secrets.outputs.present == 'true'
+        uses: ./.github/actions/android-signing
+        with:
+          keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          key-alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          key-password: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Build & distribute
+        run: bundle exec fastlane android beta
+        env:
+          # Empty when the signing step was skipped, which is exactly what the lane's
+          # release_signing_configured? checks for - so it falls back to the debug build type.
+          ANDROID_KEYSTORE_FILE: ${{ steps.signing.outputs.keystore-path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/firebase-service-account.json
+          FIREBASE_TESTER_GROUPS: testers
+          # The tag is the single source of truth for the shipped version. Passed explicitly rather
+          # than left to github.ref_name, so a dispatched run builds the version it was asked for.
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          RELEASE_NOTES: "CI build ${{ inputs.release_tag || github.ref_name }}"
+          ALLOW_UNTAGGED_BUILD: ${{ inputs.allow_untagged }}
+
+      # The one artifact worth keeping: the exact binary the testers were sent. Firebase keeps its
+      # own copy, but this is how you get at it without going through the console.
+      - name: Upload the distributed APK
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          path: composeApp/build/outputs/apk/**/*.apk
+          retention-days: 14
+          if-no-files-found: ignore

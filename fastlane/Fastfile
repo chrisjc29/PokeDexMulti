@@ -1,26 +1,410 @@
-update_fastlane
+# PokeDexMulti build automation.
+#
+#   Checks  -> compile, test, verify goldens, coverage  (fastlane android ci / fastlane ios ci)
+#   Android -> Firebase App Distribution                (fastlane android beta)
+#   Goldens -> re-record the Roborazzi screenshots      (fastlane android screenshots)
+#
+# The ci lanes exist so the GitHub workflow is a thin trigger rather than a second, drifting copy of
+# the build commands - and so the exact checks CI runs can be reproduced locally with one word.
+#
+# Credentials are read from environment variables, so the same Fastfile works locally and in CI.
+# See DISTRIBUTION.md for the full list of secrets and the one-time setup behind them.
+
+require "json" # require_firebase_credentials! reads the service-account key to check its type.
+
+# Every repository path in this file is resolved against the root explicitly, never against the
+# working directory.
+#
+# fastlane's working directory during a lane is not a thing to build on. Run bare, `Dir.pwd` inside a
+# lane body is ./fastlane; inside the `gradle` action - which resolves ./gradlew relative to
+# project_dir - it behaved as the root on the CI runner. So `"composeApp/google-services.json"` and
+# `project_dir: "."` can both be correct, in the same run, in different frames. That cost a green
+# pipeline that failed at the first real distribution with "google-services.json is missing" while
+# the file sat in the workspace exactly where the workflow had written it.
+#
+# Walking up for settings.gradle.kts is deliberately not __dir__: a Fastfile is loaded through eval,
+# and __dir__ measured "." here rather than an absolute path, so anything derived from it is relative
+# to the very working directory this is trying not to depend on. It is kept only as a second seed.
+def repo_root
+  @repo_root ||= begin
+    seeds = [Dir.pwd]
+    seeds << File.expand_path("..", __dir__) if __dir__
+
+    found = seeds.flat_map { |seed| [seed, File.expand_path("..", seed)] }
+                 .uniq
+                 .find { |candidate| File.exist?(File.join(candidate, "settings.gradle.kts")) }
+
+    UI.user_error!("Could not find the repository root (no settings.gradle.kts above #{Dir.pwd}).") \
+      if found.nil?
+
+    found
+  end
+end
+
+# Absolute path to something in the repository. Takes the same repo-relative string that appears in
+# error messages and in the workflows, so the two cannot drift.
+def repo_path(relative)
+  File.join(repo_root, relative)
+end
+
+# The package the Firebase app id has to belong to - composeApp/build.gradle.kts's applicationId.
+ANDROID_PACKAGE_NAME = "com.unomaster.pokedexgame".freeze
+
+# The Firebase Android app id we expect to be uploading to. Kept only as a cross-check: the lane
+# reads the live value out of google-services.json (see firebase_android_app_id) rather than
+# trusting this, because the two are set from different places and a stale constant uploads a
+# perfectly good build to the wrong Firebase app - where it is invisible to the testers waiting for
+# it, and reported as success.
+#
+# The project also still holds 1:109281121087:android:040cc65fdb9040e3b7f98a, registered against
+# com.unomaster.pokedexgame.android back when the Android app was its own Gradle module. The
+# restructure onto the single composeApp module dropped that suffix from applicationId and nothing
+# updated Firebase, so the google-services plugin had no client matching the package it was asked to
+# build - which is what the package check in firebase_android_app_id caught.
+EXPECTED_FIREBASE_APP_ID = "1:109281121087:android:6e0ee29901fc3a05b7f98a".freeze
+
+# Where the assembled APK lands, per build type. Named here because the beta lane has to hand
+# firebase_app_distribution an exact path, and a typo in one is only discovered after a full build.
+ANDROID_APK_PATHS = {
+  "Release" => "composeApp/build/outputs/apk/release/composeApp-release.apk",
+  "Debug" => "composeApp/build/outputs/apk/debug/composeApp-debug.apk"
+}.freeze
 
 default_platform(:android)
 
-platform :android do
-   desc "Build"
-   lane :build do
-     # fastlane now lives at the repo root (it used to sit inside the deleted androidApp module),
-     # so project_dir is the directory above this one — the Gradle root.
-     gradle(
-        task: ":composeApp:assemble",
-        build_type: "Debug",
-        project_dir: '..'
-      )
-   end
+# Verification builds Firebase off.
+#
+# composeApp/google-services.json is gitignored, so a fresh checkout does not have it and the
+# google-services plugin fails at configuration time. With the flag off, the analytics source set
+# switches to the logcat no-op (src/androidNoFirebase) and no Firebase dependency resolves at all.
+# The beta lane still builds with it on, using the real config restored from secrets - so the
+# integration is exercised where it matters and never blocks a plain compile.
+CI_PROPERTIES = { "firebase.enabled" => "false" }.freeze
 
-   desc "Submit a new Beta Build to Firebase App Distribution"
-   lane :beta do
-    build
-    firebase_app_distribution(
-        app: "1:109281121087:android:040cc65fdb9040e3b7f98a",
-        groups: "testers",
-        release_notes: "Enjoy!!"
+# Version identity, derived rather than hand-edited.
+#
+# composeApp/build.gradle.kts defaults versionCode to 1 and versionName to "1.0" and reads
+# -PversionCode / -PversionName when given them. Nothing else ties the shipped build to the tag that
+# asked for it, so android-v2.0.0 would happily have distributed "1.0 (1)" - and every distributed
+# build would carry the same version code as the last one.
+#
+# The release tag is the single source of truth. Off the pipeline it falls back to the committed
+# VERSION file, so a laptop build is identifiably a dev build of a known release line.
+def committed_version
+  path = repo_path("VERSION")
+  UI.user_error!("No VERSION file at #{path}.") unless File.exist?(path)
+
+  File.read(path).strip
+end
+
+def release_version_name
+  tag = ENV["RELEASE_TAG"] || ENV["GITHUB_REF_NAME"] || ""
+  match = tag.match(/\A(?:android|ios)-v(.+)\z/)
+  # A manual workflow_dispatch run with no release_tag has a branch name here, not a tag. That is a
+  # pipeline test rather than a release, so it gets a dev identity instead of inventing a version.
+  match ? match[1] : "#{committed_version}-dev"
+end
+
+# Derived from the version rather than from GITHUB_RUN_NUMBER. A run number is per-workflow, resets
+# when a workflow is renamed, and repeats when a release is re-run - and it has no relationship to
+# the version, so given versionCode 47 there is no way to tell which release it was.
+#
+# 1.2.3 -> 10020030. Monotonic as long as minor and patch each stay below 1000, which
+# versionCodeFrom's bounds check below enforces rather than silently wrapping.
+def release_build_number
+  # A -dev build gets 1, NOT the number its version prefix would imply: "1.0.1-dev" and a real
+  # "1.0.1" would otherwise encode to the same 10000010, so a laptop build would be
+  # indistinguishable from the shipped one on a tester's device.
+  return 1 if release_version_name.include?("-dev")
+
+  parts = release_version_name.match(/\A(\d+)\.(\d+)\.(\d+)\z/)
+  return 1 unless parts
+
+  major, minor, patch = parts.captures.map(&:to_i)
+  unless minor < 1_000 && patch < 1_000
+    UI.user_error!(
+      "versionCode cannot encode #{release_version_name} - minor and patch must each stay below 1000."
     )
-   end
+  end
+
+  major * 10_000_000 + minor * 10_000 + patch * 10
+end
+
+# Refuse to distribute a build that is not identified by a release tag.
+#
+# Without this an untagged manual run ships as "1.0.0-dev (1)", which installs over a real 1.0.0 on
+# a tester's device and looks like the release from the launcher. ALLOW_UNTAGGED_BUILD=true is the
+# deliberate escape hatch for testing the pipeline itself.
+def require_release_tag!(platform)
+  return unless release_version_name.include?("-dev")
+  return if ENV["ALLOW_UNTAGGED_BUILD"] == "true"
+
+  UI.user_error!(
+    "No release tag, so this build would ship as #{release_version_name}.\n" \
+    "Push a tag such as #{platform}-v#{committed_version}, or dispatch the #{platform} workflow " \
+    "with that tag as its release_tag input.\n" \
+    "To test the pipeline with a throwaway build, set ALLOW_UNTAGGED_BUILD=true."
+  )
+end
+
+# Whether this build can be signed with the release key.
+#
+# composeApp/build.gradle.kts decides the same thing from the same inputs (`hasReleaseSigning`) and
+# leaves the release variant unsigned when they are absent. An unsigned APK is not installable, so
+# rather than uploading one to testers the beta lane falls back to the debug build type, which is
+# signed with the auto-generated debug key and installs fine. Set the four ANDROID_* variables -
+# locally, or as GitHub secrets - and the same lane starts producing a real signed release build.
+def release_signing_configured?
+  ENV["ANDROID_KEYSTORE_FILE"].to_s.strip != "" ||
+    File.exist?(repo_path("keystore.properties"))
+end
+
+# The Firebase app config, checked before the build rather than by Gradle's configuration phase.
+#
+# firebase.enabled=true applies the google-services plugin, which aborts the build when the file is
+# missing - with a message about a "File google-services.json is missing" that names neither the
+# flag that asked for it nor where it is supposed to come from. In CI the file is written from a
+# secret, and an empty secret still writes a file, so emptiness is checked too.
+GOOGLE_SERVICES_PATH = "composeApp/google-services.json".freeze
+
+def require_google_services!
+  hint = "Download it from Firebase console -> Project settings -> Your apps -> Android, and put " \
+         "it at #{GOOGLE_SERVICES_PATH} (it is gitignored). See DISTRIBUTION.md."
+
+  unless File.file?(repo_path(GOOGLE_SERVICES_PATH))
+    UI.user_error!(
+      "#{GOOGLE_SERVICES_PATH} is missing, and this lane builds with firebase.enabled=true.\n#{hint}"
+    )
+  end
+
+  if File.size(repo_path(GOOGLE_SERVICES_PATH)).zero?
+    UI.user_error!(
+      "#{GOOGLE_SERVICES_PATH} is empty - the GOOGLE_SERVICES_JSON secret is probably unset.\n#{hint}"
+    )
+  end
+end
+
+# The app id to upload to, read from the config the build was actually configured with.
+#
+# Hardcoding it meant two independent sources for the same fact: this file, and whatever
+# google-services.json the secret happens to hold. They agree right up until the Firebase app is
+# recreated or the secret is repointed at a different project - and then the build is correct, the
+# upload succeeds, and the release lands in an app nobody is testing. There is no error to notice.
+#
+# Reading it here means there is one source. The constant above is kept only to warn when it drifts.
+def firebase_android_app_id
+  require_google_services!
+
+  config = begin
+    JSON.parse(File.read(repo_path(GOOGLE_SERVICES_PATH)))
+  rescue JSON::ParserError
+    UI.user_error!(
+      "#{GOOGLE_SERVICES_PATH} is not valid JSON. If it came from the GOOGLE_SERVICES_JSON secret, " \
+      "the secret probably holds a truncated or quoted copy - paste the whole file verbatim."
+    )
+  end
+
+  clients = config.dig("client") || []
+  client = clients.find do |c|
+    c.dig("client_info", "android_client_info", "package_name") == ANDROID_PACKAGE_NAME
+  end
+
+  if client.nil?
+    found = clients.filter_map { |c| c.dig("client_info", "android_client_info", "package_name") }
+    UI.user_error!(
+      "#{GOOGLE_SERVICES_PATH} has no Android app for #{ANDROID_PACKAGE_NAME} " \
+      "(it has: #{found.empty? ? 'none' : found.join(', ')}).\n" \
+      "Add that package as an Android app in the Firebase console, then re-download the file."
+    )
+  end
+
+  app_id = client.dig("client_info", "mobilesdk_app_id")
+  UI.user_error!("No mobilesdk_app_id for #{ANDROID_PACKAGE_NAME} in #{GOOGLE_SERVICES_PATH}.") \
+    if app_id.to_s.empty?
+
+  # Not fatal: the config is the source of truth and the upload should follow it. But a silent
+  # change of destination is worth a line in the log, because "the testers never got it" is
+  # otherwise indistinguishable from a build that did not run.
+  if app_id != EXPECTED_FIREBASE_APP_ID
+    UI.important(
+      "Firebase app id is #{app_id}, not the #{EXPECTED_FIREBASE_APP_ID} recorded in the Fastfile. " \
+      "Using the one from #{GOOGLE_SERVICES_PATH}. Update EXPECTED_FIREBASE_APP_ID if this is the " \
+      "new home for the app."
+    )
+  end
+
+  app_id
+end
+
+# The App Distribution key, checked before the build rather than by the upload.
+#
+# firebase_app_distribution takes a *path* to the key and is the last thing the beta lane does, so a
+# path that is unset, stale or pointing at the wrong file costs a full build before anything says
+# so. In CI the same lane fails the same way when the secret is empty, because an empty secret still
+# writes a file.
+#
+# The type check is not pedantry. google-services.json and a service-account key are downloaded from
+# the same console, land in the same Downloads folder and are both readable JSON, so grabbing one
+# instead of the other is an easy mistake - and its symptom is an authentication failure from Google
+# that names none of this.
+#
+# Returns the expanded path, so the lane passes exactly what was verified rather than reading the
+# variable a second time and expanding it differently.
+def require_firebase_credentials!
+  raw = ENV["FIREBASE_SERVICE_ACCOUNT_JSON"].to_s.strip
+  hint = "Generate one at Firebase console -> Project settings -> Service accounts, give it the " \
+         "Firebase App Distribution Admin role, and export its path:\n" \
+         "  export FIREBASE_SERVICE_ACCOUNT_JSON=\"$HOME/secrets/pokedex-firebase.json\"\n" \
+         "See DISTRIBUTION.md."
+
+  UI.user_error!("FIREBASE_SERVICE_ACCOUNT_JSON is unset.\n#{hint}") if raw.empty?
+
+  path = File.expand_path(raw)
+  UI.user_error!("FIREBASE_SERVICE_ACCOUNT_JSON points at #{path}, which does not exist.\n#{hint}") \
+    unless File.file?(path)
+
+  parsed = begin
+    JSON.parse(File.read(path))
+  rescue JSON::ParserError, SystemCallError
+    nil
+  end
+
+  return path if parsed.is_a?(Hash) && parsed["type"] == "service_account"
+
+  # Said three ways because the three causes have three different fixes: a truncated or empty file
+  # is a broken secret, JSON with no `type` is the wrong file, and a `type` that reads as something
+  # else is usually a user key rather than a service-account one.
+  found = if parsed.nil?
+            "it is empty or not JSON"
+          elsif parsed.is_a?(Hash) && parsed["type"].nil?
+            "it has no `type` field"
+          else
+            "its type is `#{parsed.is_a?(Hash) ? parsed['type'] : parsed.class}`"
+          end
+
+  UI.user_error!(
+    "FIREBASE_SERVICE_ACCOUNT_JSON points at #{path}, which is not a service-account key - " \
+    "#{found}.\n" \
+    "google-services.json is app config, not credentials.\n#{hint}"
+  )
+end
+
+# ---------------------------------------------------------------------------
+# Android
+# ---------------------------------------------------------------------------
+platform :android do
+  desc "Compile, run the full test suite, verify the screenshot goldens and check coverage"
+  lane :ci do
+    gradle(
+      task: ":composeApp:compileDebugKotlinAndroid",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+
+    # One invocation, not testDebugUnitTest followed by verifyRoborazziDebug. The Roborazzi tasks are
+    # the test task with a property set, so running both would execute the whole suite twice. This
+    # runs every test and verifies the committed goldens in the same pass.
+    gradle(
+      task: ":composeApp:testDebugUnitTest",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES.merge("roborazzi.test.verify" => "true"),
+      flags: "--stacktrace"
+    )
+
+    gradle(
+      task: "koverVerify",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+  end
+
+  desc "Re-record the screenshot goldens in composeApp/src/androidUnitTest/screenshots"
+  lane :screenshots do
+    gradle(
+      task: "recordRoborazziDebug",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+
+    UI.important(
+      "Goldens rewritten. Review the diff before committing - " \
+      "`git diff --stat composeApp/src/androidUnitTest/screenshots`"
+    )
+  end
+
+  desc "Build an installable APK and upload it to Firebase App Distribution"
+  lane :beta do
+    require_release_tag!("android")
+    # Reads and validates google-services.json as a side effect, so both credentials are checked
+    # before the build rather than by the upload that follows it.
+    app_id = firebase_android_app_id
+    firebase_credentials = require_firebase_credentials!
+
+    # Release when there is a key to sign it with, debug otherwise - see release_signing_configured?
+    # for why an unsigned release APK is not an option. Announced rather than inferred, because the
+    # difference matters to whoever installs the result: a debug build is debuggable, unminified, and
+    # cannot be upgraded in place by a later release-signed build.
+    build_type = release_signing_configured? ? "Release" : "Debug"
+    unless build_type == "Release"
+      UI.important(
+        "No release signing configured, so this builds the DEBUG variant. It installs and runs, but " \
+        "testers will have to uninstall it before they can take a release-signed build later. " \
+        "See DISTRIBUTION.md to set the four ANDROID_* signing secrets."
+      )
+    end
+
+    gradle(task: "clean", project_dir: repo_root)
+
+    UI.message("Building Android #{release_version_name} (#{release_build_number}) [#{build_type}]")
+
+    gradle(
+      task: "assemble",
+      build_type: build_type,
+      project_dir: repo_root,
+      properties: {
+        # google-services / Crashlytics plugins only apply when this is true, and the androidFirebase
+        # source set only compiles in when it is - so this is the only build that exercises the real
+        # analytics implementation.
+        "firebase.enabled" => "true",
+        # build.gradle.kts reads both and defaults to 1 / "1.0" without them.
+        "versionCode" => release_build_number.to_s,
+        "versionName" => release_version_name
+      }
+    )
+
+    firebase_app_distribution(
+      app: app_id,
+      apk_path: repo_path(ANDROID_APK_PATHS.fetch(build_type)),
+      # Create a "testers" group in Firebase console -> App Distribution -> Testers & Groups, or
+      # override with FIREBASE_TESTER_GROUPS.
+      groups: ENV["FIREBASE_TESTER_GROUPS"] || "testers",
+      release_notes: ENV["RELEASE_NOTES"] ||
+        "PokeDexMulti #{release_version_name} (#{release_build_number})",
+      # Verified at the top of the lane by require_firebase_credentials!, so by here it is known to
+      # be a readable service-account key rather than whatever the environment happened to hold.
+      service_credentials_file: firebase_credentials
+    )
+  end
+end
+
+# ---------------------------------------------------------------------------
+# iOS
+# ---------------------------------------------------------------------------
+platform :ios do
+  desc "Compile the shared Kotlin/Native framework for the simulator"
+  lane :ci do
+    # Compile only. The tests are shared Kotlin and already ran on the Android job, and this runs on
+    # macOS at roughly ten times the per-minute cost - but the Kotlin/Native half of every expect
+    # /actual (the clock, the key-value store, the Ktor Darwin engine) cannot be reached from any
+    # other target, so nothing else will catch a break in it.
+    gradle(
+      task: ":composeApp:compileKotlinIosSimulatorArm64",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+  end
 end
