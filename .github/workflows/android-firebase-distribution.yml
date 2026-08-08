@@ -27,12 +27,12 @@ jobs:
     steps:
       # When dispatched with a release_tag, build that tag's commit rather than the branch head -
       # otherwise the shipped code and the version stamped on it can come from different commits.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -44,7 +44,7 @@ jobs:
           bundler-cache: true
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # This lane is the only build in the repo that runs with firebase.enabled=true, so it is the
       # only one that needs the config file. It is gitignored, so it has to come from a secret.
@@ -115,7 +115,7 @@ jobs:
       # own copy, but this is how you get at it without going through the console.
       - name: Upload the distributed APK
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apk
           path: composeApp/build/outputs/apk/**/*.apk
