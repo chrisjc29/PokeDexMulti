@@ -289,6 +289,29 @@ def require_firebase_credentials!
   )
 end
 
+# The README images. Two of the five are generated from the Roborazzi goldens by
+# updateDocsScreenshots; the rest are hand-captured and that task leaves them alone.
+DOCS_SCREENSHOTS_PATH = "docs/screenshots".freeze
+
+# Fail when the generated README images no longer match the goldens they are cut from.
+#
+# The task itself is the comparison: it rewrites an image only when the pixels differ, so a dirty
+# working tree after it runs means the UI moved and the committed images did not follow. Checked
+# against git rather than by the task, so the failure names files a reviewer can diff.
+def verify_docs_screenshots!
+  clean = Dir.chdir(repo_root) do
+    system("git", "diff", "--quiet", "--", DOCS_SCREENSHOTS_PATH)
+  end
+
+  return if clean
+
+  UI.user_error!(
+    "#{DOCS_SCREENSHOTS_PATH} is out of date - regenerating it from the goldens changed the " \
+    "images, so the README is showing UI the app no longer has.\n" \
+    "Run `bundle exec fastlane android screenshots` and commit the result."
+  )
+end
+
 # ---------------------------------------------------------------------------
 # Android
 # ---------------------------------------------------------------------------
@@ -318,9 +341,21 @@ platform :android do
       properties: CI_PROPERTIES,
       flags: "--stacktrace"
     )
+
+    # The README images are cut from the goldens verified above, so regenerating them and looking at
+    # the working tree is the whole check - if the UI moved and nobody re-ran the screenshots lane,
+    # the task rewrites a file and this fails. See updateDocsScreenshots in composeApp/build.gradle.kts.
+    gradle(
+      task: "updateDocsScreenshots",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+
+    verify_docs_screenshots!
   end
 
-  desc "Re-record the screenshot goldens in composeApp/src/androidUnitTest/screenshots"
+  desc "Re-record the screenshot goldens, and the README images cut from them"
   lane :screenshots do
     gradle(
       task: "recordRoborazziDebug",
@@ -329,9 +364,24 @@ platform :android do
       flags: "--stacktrace"
     )
 
+    # In the same lane rather than a separate one, because the README images are downscaled goldens:
+    # re-recording without regenerating them is what left home.png showing a title the app had
+    # stopped using, and the ci lane would now fail on exactly that.
+    gradle(
+      task: "updateDocsScreenshots",
+      project_dir: repo_root,
+      properties: CI_PROPERTIES,
+      flags: "--stacktrace"
+    )
+
     UI.important(
-      "Goldens rewritten. Review the diff before committing - " \
-      "`git diff --stat composeApp/src/androidUnitTest/screenshots`"
+      "Goldens and README images rewritten. Review the diff before committing - " \
+      "`git diff --stat composeApp/src/androidUnitTest/screenshots #{DOCS_SCREENSHOTS_PATH}`"
+    )
+    UI.important(
+      "#{DOCS_SCREENSHOTS_PATH}/playing.png, wrong-guess.png and solved.png are hand-captured and " \
+      "are NOT touched by this lane - the goldens draw a placeholder where those screens show " \
+      "artwork. Re-capture them on a device if the game UI changed."
     )
   end
 

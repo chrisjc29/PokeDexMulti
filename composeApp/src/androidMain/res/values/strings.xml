@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher name only. The applicationId stays com.unomaster.pokedexgame so Firebase keeps
+         matching the registered app. -->
+    <string name="app_name">Who\'s That</string>
+</resources>

@@ -2,7 +2,10 @@
 
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.awt.image.BufferedImage
+import java.io.File
 import java.util.Properties
+import javax.imageio.ImageIO
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -175,6 +178,144 @@ roborazzi {
         enable = true
         packages = listOf("com.unomaster.pokedexgame")
     }
+}
+
+// The README screenshots, cut from the goldens rather than captured by hand.
+//
+// docs/screenshots used to be five phone screenshots taken off a device, which meant nothing tied
+// them to the app: renaming the home title to "Who's That" left home.png showing the old one, and
+// no test, no lane and no reviewer would ever have said so. The two screens that a golden can stand
+// in for are now generated from the goldens, and `fastlane android ci` regenerates them and fails if
+// what comes out differs from what is committed - so those images cannot drift from the UI again.
+//
+// The other three stay hand-captured, and deliberately. Previews pass an unresolvable artwork URL so
+// that no golden depends on the network, which means the game goldens draw the placeholder Pokeball
+// exactly where the real screen shows the silhouette and the revealed Pokemon - the two things those
+// README images exist to show. Generating them would cost the reader more than staleness does.
+val readmeScreenshotsFromGoldens = mapOf(
+    "home.png" to
+        "com.unomaster.pokedexgame.presentation.home.HomeScreenKt.HomeContentPreview.png",
+    "settings.png" to
+        "com.unomaster.pokedexgame.presentation.settings.SettingsScreenKt.SettingsContentEnabledPreview.png",
+)
+
+// Halved, because a golden is 1078x2337 and the README lays four of them out side by side in a
+// table. The factor is exactly two, so each output pixel is the mean of a 2x2 block: no resampling
+// kernel to pick, and nothing for the LCD's one-pixel scanlines to alias against.
+abstract class DeriveReadmeScreenshots : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val goldens: DirectoryProperty
+
+    /** README file name -> the golden it is cut from. */
+    @get:Input
+    abstract val sources: MapProperty<String, String>
+
+    @get:Internal
+    abstract val destination: DirectoryProperty
+
+    // The individual files, never the directory. docs/screenshots also holds the three
+    // hand-captured images, and declaring it as an output directory invites Gradle's stale-output
+    // cleanup to delete the files this task does not produce.
+    @get:OutputFiles
+    abstract val images: ConfigurableFileCollection
+
+    @TaskAction
+    fun derive() {
+        val goldenDir = goldens.get().asFile
+        val outputDir = destination.get().asFile
+
+        sources.get().forEach { (name, golden) ->
+            val source = File(goldenDir, golden)
+            if (!source.isFile) {
+                error(
+                    "docs/screenshots/$name is cut from $golden, which does not exist. If the " +
+                        "preview was renamed, update readmeScreenshotsFromGoldens in " +
+                        "composeApp/build.gradle.kts.",
+                )
+            }
+
+            val scaled = halve(ImageIO.read(source))
+            val target = File(outputDir, name)
+
+            // Rewriting a file whose pixels already match would churn its bytes for nothing - PNG
+            // encoders are free to differ between JDKs, and the ci lane decides whether these
+            // images are stale by looking at the working tree.
+            if (target.isFile && samePixels(ImageIO.read(target), scaled)) return@forEach
+
+            ImageIO.write(scaled, "png", target)
+            logger.lifecycle("Wrote docs/screenshots/$name from $golden")
+        }
+    }
+
+    private fun halve(source: BufferedImage): BufferedImage {
+        // Rounded up, so an odd height keeps its last row rather than dropping it. That row averages
+        // the one source row it has.
+        val width = (source.width + 1) / 2
+        val height = (source.height + 1) / 2
+        val target = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                var alpha = 0
+                var red = 0
+                var green = 0
+                var blue = 0
+                var count = 0
+
+                for (dy in 0..1) {
+                    for (dx in 0..1) {
+                        val sourceX = x * 2 + dx
+                        val sourceY = y * 2 + dy
+                        if (sourceX >= source.width || sourceY >= source.height) continue
+
+                        val pixel = source.getRGB(sourceX, sourceY)
+                        alpha += (pixel ushr 24) and 0xFF
+                        red += (pixel ushr 16) and 0xFF
+                        green += (pixel ushr 8) and 0xFF
+                        blue += pixel and 0xFF
+                        count++
+                    }
+                }
+
+                // Half-up rather than truncating: truncation darkens every image by up to one level
+                // per channel, which is invisible on its own and permanent once committed.
+                fun mean(sum: Int) = (sum + count / 2) / count
+
+                target.setRGB(
+                    x,
+                    y,
+                    (mean(alpha) shl 24) or (mean(red) shl 16) or (mean(green) shl 8) or mean(blue),
+                )
+            }
+        }
+
+        return target
+    }
+
+    private fun samePixels(left: BufferedImage, right: BufferedImage): Boolean {
+        if (left.width != right.width || left.height != right.height) return false
+
+        for (y in 0 until left.height) {
+            for (x in 0 until left.width) {
+                if (left.getRGB(x, y) != right.getRGB(x, y)) return false
+            }
+        }
+
+        return true
+    }
+}
+
+val readmeScreenshotDir = File(rootDir, "docs/screenshots")
+
+tasks.register<DeriveReadmeScreenshots>("updateDocsScreenshots") {
+    group = "documentation"
+    description = "Regenerate the README screenshots that are cut from the Roborazzi goldens."
+
+    goldens.set(layout.projectDirectory.dir("src/androidUnitTest/screenshots"))
+    sources.set(readmeScreenshotsFromGoldens)
+    destination.set(readmeScreenshotDir)
+    images.setFrom(readmeScreenshotsFromGoldens.keys.map { File(readmeScreenshotDir, it) })
 }
 
 // Coverage is measured where bugs live: domain rules, data mapping and state production. Compose
