@@ -133,9 +133,9 @@ flowchart TB
     classDef dat fill:#d9592622,stroke:#d95926,stroke-width:2px
     classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
     class VMS pres
-    class UCS dom
+    class UCS,CLOCK dom
     class REPOS,RAND,HTTP,ENGINE,KVS dat
-    class INIT,APPM,PLATM,NAVM,CLOCK,ANA,NAVIGATOR,ENTRIES infra
+    class INIT,APPM,PLATM,NAVM,ANA,NAVIGATOR,ENTRIES infra
 ```
 
 `platformModule` on Android does `includes(analyticsModule)`, which resolves to whichever variant

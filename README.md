@@ -32,44 +32,54 @@ monospaced readouts. One round, start to finish:
 ## Architecture
 
 Clean layers, one shared Kotlin module. **Almost every arrow points inward** — `domain` imports
-nothing from `data`, `presentation` or any platform, and `data` depends on `domain` only by
-implementing its contracts. Koin is the one thing that knows all three. The single exception is drawn
-below: the ViewModels reach `BestStreakStore` directly, because one persisted integer never earned a
-domain repository.
+nothing from `data`, `presentation` or any platform, and `data` touches `domain` only by implementing
+its contracts or consuming them. Two things cut across all three layers: Koin, which constructs
+everything, and `analytics/`, whose two interfaces the repository and every ViewModel hold. The one
+edge that skips a layer is drawn below — the ViewModels reach `BestStreakStore` and `KeyValueStore`
+directly, because one persisted integer and one boolean never earned a domain repository.
 
 Colour means the same thing in every diagram here and in [docs/architecture.md](docs/architecture.md):
-🔵 **presentation** · 🟢 **domain** · 🟠 **data** · ⚪ dashed grey **cross-cutting** (Koin, platform,
-navigation plumbing) · 🔴 **failure path**. Every box is also grouped and labelled, so nothing is
-carried by colour alone.
+🔵 **presentation** · 🟢 **domain** · 🟠 **data** · ⚪ dashed grey **cross-cutting** (Koin, analytics,
+platform, navigation plumbing) · 🔴 **failure path**. Every box is also grouped and labelled, so
+nothing is carried by colour alone.
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph PRES["presentation"]
         SCREEN["HomeScreen · GameScreen · SettingsScreen<br/>stateless Content composables"]
         VMODEL["HomeViewModel · GameViewModel · SettingsViewModel<br/>State · Intent · Effect"]
     end
     subgraph DOM["domain"]
         USECASE["GetPokemonQuestionUseCase"]
-        CONTRACT["PokemonRepository · RandomSource<br/>CurrentTimeProvider"]
         MODEL["PokemonQuestion"]
         DERROR["DomainError<br/>sealed interface"]
+        REPOC["PokemonRepository"]
+        RANDC["RandomSource"]
+        CLOCKC["CurrentTimeProvider"]
     end
     subgraph DATA["data"]
         REPO["PokemonRepositoryImpl"]
         REMOTE["KtorPokemonRemoteSource"]
-        LOCAL["BestStreakStore · KeyValueStore"]
         DTO["PokemonPageDto · PokemonDetailDto"]
+        RANDIMPL["KotlinRandomSource"]
+        LOCAL["BestStreakStore · KeyValueStore"]
     end
     KOIN["Koin<br/>appModule · platformModule · navigationModule"]
+    ANALYTICS["analytics/<br/>Analytics · CrashReporter"]
 
     SCREEN --> VMODEL
     VMODEL --> USECASE
-    VMODEL -->|"best streak · no domain type"| LOCAL
-    USECASE --> CONTRACT
+    VMODEL --> CLOCKC
+    VMODEL -->|"best streak · analytics opt-in<br/>no domain type"| LOCAL
+    VMODEL -. "OperationViewModel reports" .-> ANALYTICS
+    USECASE --> REPOC
     USECASE --> MODEL
     USECASE --> DERROR
-    REPO -. implements .-> CONTRACT
+    REPO -. implements .-> REPOC
+    REPO --> RANDC
     REPO --> REMOTE
+    REPO -. "logs pokemon_question_loaded" .-> ANALYTICS
+    RANDIMPL -. implements .-> RANDC
     REMOTE --> DTO
     DTO -. maps to .-> MODEL
     KOIN -. constructs .-> VMODEL
@@ -81,13 +91,17 @@ flowchart TB
     classDef dat fill:#d9592622,stroke:#d95926,stroke-width:2px
     classDef infra fill:#8b949e1f,stroke:#8b949e,stroke-width:1.5px,stroke-dasharray:4 3
     class SCREEN,VMODEL pres
-    class USECASE,CONTRACT,MODEL,DERROR dom
-    class REPO,REMOTE,LOCAL,DTO dat
-    class KOIN infra
+    class USECASE,REPOC,RANDC,CLOCKC,MODEL,DERROR dom
+    class REPO,REMOTE,RANDIMPL,LOCAL,DTO dat
+    class KOIN,ANALYTICS infra
     style PRES fill:#3987e50d,stroke:#3987e5,stroke-width:1px
     style DOM fill:#199e700d,stroke:#199e70,stroke-width:1px
     style DATA fill:#d959260d,stroke:#d95926,stroke-width:1px
 ```
+
+Two contracts are implemented outside `commonMain` and so have no implementer drawn above:
+`CurrentTimeProvider` and `KeyValueStore` are `expect`/`actual` seams filled by `androidMain` and
+`iosMain` — see the source-set diagram in [docs/architecture.md](docs/architecture.md).
 
 ### The MVI loop
 
@@ -155,13 +169,14 @@ sequenceDiagram
             NET-->>REPO: Right(PokemonDetailDto)
             REPO->>REPO: analytics.logEvent pokemon_question_loaded
             REPO-->>UC: Right(PokemonQuestion)
-            UC-->>VM: Right, after ensure on the four choices
+            UC-->>VM: Right, after ensure: four choices, one correct
             VM->>VM: state = artwork + choices, isLoading false
         end
-    else transport error, 429, or too few results
+    else transport error, 429, or a page too short to build a round
         rect rgba(227, 73, 72, 0.12)
             API-->>NET: failure
             NET-->>REPO: Left(DomainError)
+            REPO->>REPO: or ensure(results >= 4) fails on a 200
             REPO-->>UC: Left, bind short-circuits
             UC-->>VM: Left(DomainError)
             VM->>VM: crashReporter, unless the server was just talking
@@ -190,14 +205,16 @@ player never sees it. Nothing above the data layer knows PokeAPI exists.
 
 **MVI, one folder per feature.** `GameScreen` / `GameState` / `GameIntent` / `GameEffect` /
 `GameViewModel`. State re-emits; effects (`WrongAnswerFeedback`) go through a `Channel` so they fire
-exactly once. `Home` deliberately has no `HomeState` or `HomeEffect` — the start screen renders
-nothing that varies — but it still has a ViewModel, because navigation is a decision.
+exactly once. `Home` has a `HomeState` of exactly one field — the best streak the player has ever
+reached — but deliberately no `HomeEffect`: the start screen fires nothing one-shot, and an empty
+effect type is a file to keep in step for no benefit. `Settings` is the same shape.
 
 **`RandomSource`** is injected rather than called inline: it decides which Pokemon is the answer and
 shuffles the choices, so a test can pin the round. **`CurrentTimeProvider`** (plus the `TimeZone`) is
-the clock seam and is wired through `platformModule` with a `FixedCurrentTimeProvider` fake ready in
-`commonTest`; nothing consumes it yet, but it is there so no future feature reaches for
-`Clock.System.now()` directly.
+the clock seam, wired through `platformModule` with a `FixedCurrentTimeProvider` fake in `commonTest`.
+`GameViewModel` times each round through it — `roundStartedAt` when the artwork loads,
+`solveSeconds` on the reveal — so the solve time is pinned in tests rather than raced against the
+wall clock. Nothing reaches for `Clock.System.now()` directly.
 
 ### Settings
 
