@@ -86,7 +86,7 @@ fun HomeContent(
                         verticalArrangement = Arrangement.spacedBy(Dimens.SpacingExtraSmall),
                     ) {
                         Text(
-                            text = "POKÉDEX GAME",
+                            text = "WHO'S THAT",
                             style = DexTypography.Title,
                             color = colors.deviceScreenInk,
                             textAlign = TextAlign.Center,

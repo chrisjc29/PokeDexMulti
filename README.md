@@ -1,4 +1,4 @@
-# PokeDex Game
+# Who's That
 
 Guess the Pokemon from its silhouette. A Compose Multiplatform app targeting **iOS and Android** from
 one shared Kotlin codebase — a single `composeApp` module holds the shared code *and* is the Android

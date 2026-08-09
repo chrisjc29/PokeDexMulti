@@ -1,4 +1,4 @@
-# PokeDex Game — architecture
+# Who's That — architecture
 
 Diagrams for the parts of the project you only need once you're editing it. The layer diagram, the
 MVI loop and the request sequence live in the [README](../README.md).
