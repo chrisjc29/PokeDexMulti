@@ -1,4 +1,4 @@
-# PokeDex Game
+# Who's That
 
 Guess the Pokemon from its silhouette. A Compose Multiplatform app targeting **iOS and Android** from
 one shared Kotlin codebase — a single `composeApp` module holds the shared code *and* is the Android
@@ -12,6 +12,12 @@ opt-in) · clean architecture (data / domain / presentation) · MVI presentation
 
 The whole UI is a handheld Pokédex — red shell, hinged screen bezel, scanline glass, LED cluster and
 monospaced readouts. One round, start to finish:
+
+<sub>**Home** and **Settings** are generated — halved straight from the Roborazzi goldens by
+`./gradlew updateDocsScreenshots`, and CI fails if they drift from the UI. The three game shots are
+hand-captured on a device on purpose: previews use an unresolvable artwork URL so no golden depends
+on the network, so a generated one would draw the placeholder Pokéball exactly where these show the
+silhouette and the revealed Pokémon. Re-capture those three by hand when the game UI changes.</sub>
 
 <table>
   <tr>
@@ -360,6 +366,7 @@ fails to resolve. Intel Macs cannot run the simulator build.
 ./gradlew :composeApp:testDebugUnitTest   # component + feature tiers + the Koin graph test
 ./gradlew recordRoborazziDebug            # write the screenshot baseline — run once, then commit
 ./gradlew verifyRoborazziDebug            # fail if the UI drifts from the goldens
+./gradlew updateDocsScreenshots           # re-cut the generated README images from those goldens
 ./gradlew koverVerify                     # 90% coverage gate on the logic layers
 ```
 
@@ -392,12 +399,12 @@ Two GitHub workflows, both thin triggers around a Fastlane lane so the same chec
 
 | Workflow | Fires on | Does |
 | --- | --- | --- |
-| `ci.yml` | PRs to `main`, pushes to `main` | Compiles, runs the suite, verifies the goldens, checks coverage |
+| `ci.yml` | PRs to `main`, pushes to `main` | Compiles, runs the suite, verifies the goldens and the generated README images, checks coverage |
 | `android-firebase-distribution.yml` | `android-v*` tags, manual | Builds an APK and ships it to Firebase App Distribution |
 
 ```bash
 bundle exec fastlane android ci           # exactly what CI runs
-bundle exec fastlane android screenshots  # re-record the Roborazzi goldens
+bundle exec fastlane android screenshots  # re-record the goldens + the generated README images
 bundle exec fastlane android beta         # build, then upload to App Distribution ("testers")
 bundle exec fastlane ios ci               # compile the Kotlin/Native framework
 ```

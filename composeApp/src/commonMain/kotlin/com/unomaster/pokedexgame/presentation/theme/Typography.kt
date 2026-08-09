@@ -32,7 +32,7 @@ val AppTypography = Typography(
 object DexTypography {
     private val Mono = FontFamily.Monospace
 
-    /** `POKEDEX GAME` on the home LCD. */
+    /** `WHO'S THAT` on the home LCD. */
     val Title = TextStyle(
         fontFamily = Mono,
         fontSize = 20.sp,
