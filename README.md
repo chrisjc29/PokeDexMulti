@@ -317,6 +317,21 @@ implements — Kotlin never links the Firebase SDK.
 
 Both real config files are git-ignored; only the `.PLACEHOLDER` copies are meant to be committed.
 
+### Keeping credentials out of git
+
+`.gitignore` covers both real config files, but `git add -f` walks straight past it. A pre-commit
+hook in `.githooks/` is the backstop: it blocks any commit that stages `google-services.json`,
+`GoogleService-Info.plist`, or a string shaped like a Google API key, whatever the filename.
+
+Git does not enable repo-tracked hooks automatically, so turn it on once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This is worth doing — the iOS `GoogleService-Info.plist` *was* committed here once, and its API key
+had to be purged from the history and deleted in Google Cloud.
+
 ## Project layout
 
 - `composeApp/` — the shared KMP module, and the Android application.

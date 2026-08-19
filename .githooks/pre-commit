@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# Blocks commits that would leak Firebase / Google credentials.
+#
+# History: the iOS GoogleService-Info.plist was committed from the initial commit
+# until it was untracked in 2026-08, and GitHub secret-scanning flagged the API key
+# inside it. On 2026-08-19 the file was purged from the whole history with
+# git-filter-repo and the key itself was deleted in Google Cloud, so that
+# particular credential is dead — this hook exists so the next one never lands.
+# .gitignore already covers both Firebase config files, but `git add -f` walks
+# straight past .gitignore — this hook is the backstop for that.
+#
+# Enable (once per clone):  git config core.hooksPath .githooks
+
+set -euo pipefail
+
+fail=0
+
+# Anything staged, excluding deletions.
+staged=$(git diff --cached --name-only --diff-filter=d)
+[ -z "$staged" ] && exit 0
+
+# --- 1. The real Firebase config files, by path -----------------------------
+# The .PLACEHOLDER variants are meant to be committed; the real ones never are.
+while IFS= read -r file; do
+    case "$file" in
+        *.PLACEHOLDER) continue ;;
+        composeApp/google-services.json|iosApp/iosApp/GoogleService-Info.plist)
+            echo "BLOCKED: $file holds real Firebase credentials and must stay untracked."
+            echo "         Commit the .PLACEHOLDER instead:  git restore --staged $file"
+            fail=1
+            ;;
+    esac
+done <<< "$staged"
+
+# --- 2. Google API keys in staged content, whatever the filename ------------
+# Google API keys are the literal 'AIza' prefix plus 35 chars of base64url.
+# Scan the staged blobs rather than the worktree so partial `git add -p` counts.
+for file in $staged; do
+    case "$file" in
+        .githooks/pre-commit) continue ;;  # this file documents the pattern
+    esac
+    # Skip binaries.
+    if git show ":$file" 2>/dev/null | grep -qI . 2>/dev/null; then
+        if match=$(git show ":$file" 2>/dev/null | grep -nE 'AIza[0-9A-Za-z_-]{35}' | head -3); then
+            echo "BLOCKED: $file contains what looks like a Google API key:"
+            echo "$match" | sed 's/AIza[0-9A-Za-z_-]\{35\}/AIza************************[REDACTED]/g; s/^/         /'
+            fail=1
+        fi
+    fi
+done
+
+if [ "$fail" -ne 0 ]; then
+    echo
+    echo "Commit aborted. If this is a false positive, bypass with: git commit --no-verify"
+    exit 1
+fi
+
+exit 0
